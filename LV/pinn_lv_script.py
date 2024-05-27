@@ -103,46 +103,37 @@ if __name__ == "__main__":
     num_points = 1000
     dt = (tf - t0) / (num_points - 1)
     x, t = RK4(f, x0, t0, tf, dt)
-
+    times =[1.1, 2.4, 3.9, 5.6, 7.5, 9.6, 11.9, 14.4]
+    for time in times:
+        print(time in t)
+    
+    exit()
     # Generating obs data
-    random_indices = np.random.choice(len(t), size=50, replace=False)
+    random_indices = np.random.choice(len(t), size=100, replace=False)
     x_obs = [x[0][ind] for ind in random_indices]
     y_obs = [x[1][ind] for ind in random_indices]
     # Generate Gaussian noise for x_obs and y_obs
-    noise_x = 0.04 * np.random.randn(len(x_obs))
-    noise_y = 0.04 * np.random.randn(len(y_obs))
+    noise_x = 0.03 * np.random.randn(len(x_obs))
+    noise_y = 0.03 * np.random.randn(len(y_obs))
     # Add the noise to the observed values
     x_obs_noise = [x_obs[ind] + noise_x[ind] for ind in range(len(x_obs))]
     y_obs_noise = [y_obs[ind] + noise_y[ind] for ind in range(len(y_obs))]
 
     # Tensors
     t_obs = torch.tensor([t[ind] for ind in random_indices], dtype=torch.float32).view(-1,1)
-    u_obs_x = torch.tensor(x_obs,  dtype=torch.float32).view(-1,1) # Noise?
-    u_obs_y = torch.tensor(y_obs,  dtype=torch.float32).view(-1,1)
-    # Create 30 approx. equally spaced points for training 
+    u_obs_x = torch.tensor(x_obs_noise,  dtype=torch.float32).view(-1,1) # Noise?
+    u_obs_y = torch.tensor(y_obs_noise,  dtype=torch.float32).view(-1,1) 
     t_physics = []
     for i in range(1000):
-        if i % 34 == 0:
+        if i % 20 == 0:
             t_physics.append(t[i])
     t_physics = torch.tensor(t_physics, dtype=torch.float32).view(-1,1).requires_grad_(True)
-    # Create 300 approx. equally spaced points for testing 
-    t_test = []
-    u_test_x = []
-    u_test_y = []
-    for i in range(999):
-        if i % 3 == 0:
-            u_test_x.append(x[0][i])
-            u_test_y.append(x[1][i])
-            t_test.append(t[i])
-    t_test = torch.tensor(t_test, dtype=torch.float32).view(-1,1).requires_grad_(True)
-    u_test_x = torch.tensor(u_test_x, dtype=torch.float32).view(-1,1)
-    u_test_y = torch.tensor(u_test_y, dtype=torch.float32).view(-1,1)
 
-    # Initializing stuff
+    # Initializing 
     pinn = FCN(1,1,32,3)
     optimizer = torch.optim.Adam(pinn.parameters(), lr=1e-3)
     target_params = (1.0, 1.0, 1.0, 1.0)
-    tolerance = 0.25
+    tolerance = 0.02
 
     exec_time, end_it, final_params = train_pinn(pinn, optimizer, t_physics, t_obs, u_obs_x, u_obs_y, target_params, tolerance)
     print(f"Execution Time: {exec_time} seconds")
