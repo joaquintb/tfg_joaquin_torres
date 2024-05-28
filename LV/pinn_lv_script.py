@@ -97,7 +97,7 @@ if __name__=="__main__":
     # Hyperparameter deciding weight given to fitting observational data
     lambda_weight = 100
     # Number of training iterations
-    max_it = 10000
+    max_it = 30000
 
     # Training loop
     for i in tqdm.tqdm(range(max_it)):
