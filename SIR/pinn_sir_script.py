@@ -64,13 +64,13 @@ if __name__=="__main__":
     # Generating observations
     # Generate 10 equispaced time locations in the domain for fair comparison with ABC-SMC
     obs_ind = np.linspace(0, len(t) - 1, 10, dtype=int)
-    S_obs = [S[ind] for ind in obs_ind]
-    I_obs = [I[ind] for ind in obs_ind]
-    R_obs = [R[ind] for ind in obs_ind]
+    S_obs = np.array([S[ind] for ind in obs_ind])
+    I_obs = np.array([I[ind] for ind in obs_ind])
+    R_obs = np.array([R[ind] for ind in obs_ind])
     # Generate Gaussian noise for S_obs, I_obs, and R_obs
-    noise_S = 0.5 * np.random.randn(len(S_obs))
-    noise_I = 0.5 * np.random.randn(len(I_obs))
-    noise_R = 0.5 * np.random.randn(len(R_obs))
+    noise_S = 0.01 * S_obs * np.random.randn(len(S_obs))
+    noise_I = 0.01 * I_obs * np.random.randn(len(I_obs))
+    noise_R = 0.01 * R_obs * np.random.randn(len(R_obs))
     # Add the noise to the observed values
     S_obs_noise = [S_obs[ind] + noise_S[ind] for ind in range(len(S_obs))]
     I_obs_noise = [I_obs[ind] + noise_I[ind] for ind in range(len(I_obs))]
