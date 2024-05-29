@@ -226,8 +226,8 @@ if __name__ == "__main__":
     midata=rk4(lotka_volterra,X0,t,parametros)
     x,y = midata.T    
     # Generate Gaussian Noise
-    noise_x = 0.05*np.random.randn(len(x))
-    noise_y = 0.05*np.random.randn(len(y))
+    noise_x = 0.01 * x * np.random.randn(len(x))
+    noise_y = 0.01 * y * np.random.randn(len(y))
     x_obs = x + noise_x
     y_obs = y + noise_y
     midata = np.vstack((x_obs, y_obs)).T

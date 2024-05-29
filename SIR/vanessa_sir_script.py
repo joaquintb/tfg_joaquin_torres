@@ -231,9 +231,9 @@ if __name__ == "__main__":
     SIR = scipy.integrate.odeint(deriv_SIR, y0, t2, args=(N, betaI, gammaI))
     S, I, R = SIR.T  # Transpose to separate S, I, R
     # Generate Gaussian noise
-    noise_S = 0.1 * np.random.randn(len(S))
-    noise_I = 0.1 * np.random.randn(len(I))
-    noise_R = 0.1 * np.random.randn(len(R))
+    noise_S = 0.01 * S * np.random.randn(len(S))
+    noise_I = 0.01 * I * np.random.randn(len(I))
+    noise_R = 0.01 * R * np.random.randn(len(R))
     # Add noise to observations
     S_obs = S + noise_S
     I_obs = I + noise_I
