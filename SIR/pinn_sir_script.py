@@ -4,7 +4,6 @@
 
 # Libraries
 import numpy as np
-import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import tqdm as tqdm
@@ -93,14 +92,18 @@ if __name__=="__main__":
     pinn = FCN(1,1,32,3)
     # Sample initial problems parameters from uniform 0 to 10 for comparison to be fair
     beta = torch.nn.Parameter(torch.empty(1).uniform_(0, 10), requires_grad=True)
+    gamma = torch.nn.Parameter(torch.empty(1).uniform_(0, 10), requires_grad=True)
     # Define optimiser and make problem parameters learnable
     optimiser = torch.optim.Adam(list(pinn.parameters())+[beta,gamma],lr=1e-2)
     # Hyperparameter deciding weight given to fitting observational data
     lambda_weight = 10
     # Number of training iterations
-    max_its = 30000
+    max_its = 10000
+    # Distance to target parameters needed to stop training
+    tol = 0.01
+    beta_t, gamma_t = 1.5, 0.5 # Target params
 
-    for i in tqdm.tqdm(range(max_its)):
+    for i in range(max_its):
         # Reset gradient to zero
         optimiser.zero_grad()
         # -----------------------
@@ -131,5 +134,13 @@ if __name__=="__main__":
         loss.backward()
         optimiser.step()
 
+        # Check if parameter distance within tolerance
+        if abs(beta.item() - beta_t) < tol and abs(gamma.item() - gamma_t) < tol:
+            print(f"Stopping training: parameters within tolerance after {i+1} iterations.")
+            break
+    
+        # Logging
+        if i % 1000 == 0:  
+            print(f"Iteration {i}: beta = {beta.item()}, gamma = {gamma.item()}")
     print(beta.item())
     print(gamma.item())
