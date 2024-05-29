@@ -227,10 +227,20 @@ if __name__ == "__main__":
     t2 = np.linspace(0, finalT, 10)
     # Initial conditions vector
     y0 = S0, I0, R0
-    # Integrate the SIR equations over the time grid, t.
-    ret_SIR = scipy.integrate.odeint(deriv_SIR, y0, t, args=(N, betaI, gammaI))
+    # Observations
     SIR = scipy.integrate.odeint(deriv_SIR, y0, t2, args=(N, betaI, gammaI))
-    S, I, R = ret_SIR.T
+    S, I, R = SIR.T  # Transpose to separate S, I, R
+    # Generate Gaussian noise
+    noise_S = 0.1 * np.random.randn(len(S))
+    noise_I = 0.1 * np.random.randn(len(I))
+    noise_R = 0.1 * np.random.randn(len(R))
+    # Add noise to observations
+    S_obs = S + noise_S
+    I_obs = I + noise_I
+    R_obs = R + noise_R
+    # Combine the noisy observations into a single array for ABC-SMC
+    SIR = np.vstack((S_obs, I_obs, R_obs)).T  # Transpose to get columns as S, I, R
+
     epsilons=[60, 50, 40, 20, 10, 5,2,1.5,1,0.5]
 
     params_SIR = [
@@ -243,17 +253,8 @@ if __name__ == "__main__":
     # Access the best parameter values
     final_samples = sample[-1]  # Last set of samples
     final_distances = dist[-1]  # Last set of distances
-
     best_index = np.argmin(final_distances) 
-
     # Extract the best parameter set
     best_params = final_samples[best_index]
-
-    # Print best beta and gamma
-    print(f"Best Beta: {best_params[0]}, Best Gamma: {best_params[1]}")
-
-    # Extract the best parameter set
-    best_params = final_samples[best_index]
-
     # Print best beta and gamma
     print(f"Best Beta: {best_params[0]}, Best Gamma: {best_params[1]}")

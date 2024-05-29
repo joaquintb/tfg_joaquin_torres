@@ -222,10 +222,15 @@ if __name__ == "__main__":
     t=[1.1, 2.4, 3.9, 5.6, 7.5, 9.6, 11.9, 14.4]
     # To solve system numerically
     t1=np.linspace(0,15,1000)
-    # Solved system numerically
-    data1=rk4(lotka_volterra,X0,t1,parametros)
     # Solution at 8 observational points
     midata=rk4(lotka_volterra,X0,t,parametros)
+    x,y = midata.T    
+    # Generate Gaussian Noise
+    noise_x = 0.05*np.random.randn(len(x))
+    noise_y = 0.05*np.random.randn(len(y))
+    x_obs = x + noise_x
+    y_obs = y + noise_y
+    midata = np.vstack((x_obs, y_obs)).T
 
     sample,weight,dist,data2=principal(epsilons,params_lotka_volterra,100,midata,t)
 
@@ -233,11 +238,9 @@ if __name__ == "__main__":
     # Extract the last population
     last_samples = sample[-1, :]  # Assuming sample is a 2D array
     last_distances = dist[-1, :]
-
     # Best parameters based on the minimum distance
     best_index = np.argmin(last_distances)
     best_params = last_samples[best_index]
-
     # Print the best parameter values based on distance
     print("Best parameter values based on the smallest distance:")
     print(f"a: {best_params[0]}")
