@@ -81,8 +81,6 @@ if __name__=="__main__":
     # Physic loss training points
     # Tensor of times to train PINN through physics loss
     t_physics = torch.linspace(t0, tf, 500).view(-1, 1).requires_grad_(True)
-    # Tensor of times to check progress of PINN when training
-    t_test = torch.linspace(t0, tf, 200).view(-1, 1).requires_grad_(True)
 
     # Training setup
     # Initialize PINN
@@ -92,7 +90,7 @@ if __name__=="__main__":
     b = torch.nn.Parameter(torch.empty(1).uniform_(0, 10), requires_grad=True)
     c = torch.nn.Parameter(torch.empty(1).uniform_(0, 10), requires_grad=True)
     d = torch.nn.Parameter(torch.empty(1).uniform_(0, 10), requires_grad=True)
-    # Define optimiser 
+    # Define optimiser and make problem parameters learnable
     optimiser = torch.optim.Adam(list(pinn.parameters())+[a,b,c,d],lr=1e-3)
     # Hyperparameter deciding weight given to fitting observational data
     lambda_weight = 100
@@ -103,7 +101,6 @@ if __name__=="__main__":
     for i in tqdm.tqdm(range(max_it)):
         # Reset gradient to zero
         optimiser.zero_grad()
-
         # -----------------------
         #       PHYSICS LOSS
         # -----------------------
@@ -116,7 +113,6 @@ if __name__=="__main__":
         phy_loss_y = torch.mean((du2dt + c*u2 - d*u1*u2) ** 2)
         # Compute total physics loss
         total_physics_loss = phy_loss_x + phy_loss_y
-
         # -----------------------
         #       DATA LOSS
         # -----------------------
@@ -128,14 +124,12 @@ if __name__=="__main__":
         data_loss_y = torch.mean((u2 - u_obs_y)**2)
         # Compute total data loss
         total_data_loss = data_loss_x + data_loss_y
-
         # Compute total loss
         loss = total_physics_loss + lambda_weight*total_data_loss
-
         # Backpropagate joint loss, take optimiser step
         loss.backward()
         optimiser.step()
-           
+    
     print(a.item())
     print(b.item())
     print(c.item())
