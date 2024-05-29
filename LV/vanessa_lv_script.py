@@ -229,30 +229,18 @@ if __name__ == "__main__":
 
     sample,weight,dist,data2=principal(epsilons,params_lotka_volterra,100,midata,t)
 
-    # print("min accepted distance: ",np.min(dist[-1,:]))
-    # parama=[]
-    # for j in sample[-1,:]:
-    #     parama.append(j[0])
+    # Print a,b,c,d values at the end (last population, best values overall)
+    # Extract the last population
+    last_samples = sample[-1, :]  # Assuming sample is a 2D array
+    last_distances = dist[-1, :]
 
-    # amean=np.mean(parama)
-    # amed=np.median(parama)
-    # avar=np.var(parama)
-    # print('mean',amean)
-    # print('median',amed)
-    # print('variance',avar)
+    # Best parameters based on the minimum distance
+    best_index = np.argmin(last_distances)
+    best_params = last_samples[best_index]
 
-    # # Print a,b,c,d values at the end (last population, best values overall)
-    # # Extract the last population
-    # last_samples = sample[-1, :]  # Assuming sample is a 2D array
-    # last_distances = dist[-1, :]
-
-    # # Best parameters based on the minimum distance
-    # best_index = np.argmin(last_distances)
-    # best_params = last_samples[best_index]
-
-    # # Print the best parameter values based on distance
-    # print("Best parameter values based on the smallest distance:")
-    # print(f"a: {best_params[0]}")
-    # print(f"b: {best_params[1]}")
-    # print(f"c: {best_params[2]}")
-    # print(f"d: {best_params[3]}")
+    # Print the best parameter values based on distance
+    print("Best parameter values based on the smallest distance:")
+    print(f"a: {best_params[0]}")
+    print(f"b: {best_params[1]}")
+    print(f"c: {best_params[2]}")
+    print(f"d: {best_params[3]}")
