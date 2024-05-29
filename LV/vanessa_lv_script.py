@@ -132,7 +132,7 @@ def normalize(wei):
     normalized=wei/np.sum(wei)
     return normalized  
 
-def principal(epsilons,listaparametros,N,data1,t):
+def principal(epsilons,listaparametros,N,data1,t, tol_target):
    # accepted_distances = np.loadtxt('smc/distances_{}_{}_{}_{}.out'.format(model,sto,gamma,prior_label))
     T=len(epsilons)
     weight=np.zeros((T,N),float)
@@ -193,6 +193,14 @@ def principal(epsilons,listaparametros,N,data1,t):
         #print('weight[i,:]',weight[i,:])
         if i!=0:
            weight[i,:]=normalize(weight[i,:])
+
+        # Check convergence using tolerance targets for beta and gamma
+        best_index = np.argmin(dist[i, :])
+        best_params = sample[i, best_index]
+        if all(abs(best_params[k] - listaparametros[k]['target_value']) < tol_target[k] for k in range(len(best_params))):
+            print(f"Converged to within tolerance at iteration {i + 1}.")
+            print(f"Best parameters: a={best_params[0]}, b={best_params[1]}, c={best_params[2]}, d={best_params[3]}")
+            return sample, weight, dist, data2, True  # Return with a flag indicating early stopping
            #print('weight[i,:] normalized',weight[i,:])
         #pars = np.loadtxt('smc_van/pars_{}.out'.format(i))
         #weights = np.loadtxt('smc_van/weights_{}.out'.format(i))
@@ -202,7 +210,7 @@ def principal(epsilons,listaparametros,N,data1,t):
     #print('sample',sample[T-1,N-1])
     #print('weight',weight[T-1])
     #print('dist',dist[T-1])
-    return sample, weight, dist,data2
+    return sample, weight, dist,data2, False
 
 if __name__ == "__main__":
 
@@ -211,10 +219,10 @@ if __name__ == "__main__":
     parametros = [1,1,1,1]
     # Define the parameter ranges for the Lotka-Volterra model
     params_lotka_volterra = [
-        {'name': 'a', 'lower_limit': 0.0, 'upper_limit': 10.0},  # growth rate of prey in absence of predators
-        {'name': 'b', 'lower_limit': 0.0, 'upper_limit': 10.0},  # predation rate
-        {'name': 'c', 'lower_limit': 0.0, 'upper_limit': 10.0},  # mortality rate of predators
-        {'name': 'd', 'lower_limit': 0.0, 'upper_limit': 10.0}   # rate at which predators increase by consuming prey
+        {'name': 'a', 'lower_limit': 0.0, 'upper_limit': 10.0, 'target_value': parametros[0]},  # growth rate of prey in absence of predators
+        {'name': 'b', 'lower_limit': 0.0, 'upper_limit': 10.0, 'target_value': parametros[1]},  # predation rate
+        {'name': 'c', 'lower_limit': 0.0, 'upper_limit': 10.0, 'target_value': parametros[2]},  # mortality rate of predators
+        {'name': 'd', 'lower_limit': 0.0, 'upper_limit': 10.0, 'target_value': parametros[3]}   # rate at which predators increase by consuming prey
     ]
 
     X0=[0.5,1]
@@ -232,18 +240,22 @@ if __name__ == "__main__":
     y_obs = y + noise_y
     midata = np.vstack((x_obs, y_obs)).T
 
-    sample,weight,dist,data2=principal(epsilons,params_lotka_volterra,100,midata,t)
+    # Define tolerance distance to target parameters for early stopping
+    tol_target = [0.02, 0.02, 0.02, 0.02]
 
-    # Print a,b,c,d values at the end (last population, best values overall)
-    # Extract the last population
-    last_samples = sample[-1, :]  # Assuming sample is a 2D array
-    last_distances = dist[-1, :]
-    # Best parameters based on the minimum distance
-    best_index = np.argmin(last_distances)
-    best_params = last_samples[best_index]
-    # Print the best parameter values based on distance
-    print("Best parameter values based on the smallest distance:")
-    print(f"a: {best_params[0]}")
-    print(f"b: {best_params[1]}")
-    print(f"c: {best_params[2]}")
-    print(f"d: {best_params[3]}")
+    sample,weight,dist,data2, stopped_early =principal(epsilons,params_lotka_volterra,100,midata,t, tol_target)
+
+    # Check if stopped early
+    if stopped_early:
+        print("Algorithm stopped early due to convergence.")
+    else:
+        # Process results if the algorithm completes all iterations
+        final_samples = sample[-1]  # Last set of samples
+        final_distances = dist[-1]  # Last set of distances
+        best_index = np.argmin(final_distances)
+        # Extract the best parameter set
+        best_params = final_samples[best_index]
+        print(f"a: {best_params[0]}")
+        print(f"b: {best_params[1]}")
+        print(f"c: {best_params[2]}")
+        print(f"d: {best_params[3]}")
