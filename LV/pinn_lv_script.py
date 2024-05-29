@@ -62,11 +62,11 @@ if __name__=="__main__":
     # Generate 8 equispaced time locations in the domain for fair comparison with ABC-SMC
     obs_ind = np.linspace(0, len(t) - 1, 8, dtype=int)
     # Get solution at those time locations
-    x_obs = [x[0][ind] for ind in obs_ind]
-    y_obs = [x[1][ind] for ind in obs_ind]
+    x_obs = np.array([x[0][ind] for ind in obs_ind])
+    y_obs = np.array([x[1][ind] for ind in obs_ind])
     # Generate Gaussian noise to add to the observations
-    noise_x = 0.03 * np.random.randn(len(x_obs))
-    noise_y = 0.03 * np.random.randn(len(y_obs))
+    noise_x = 0.01 * x_obs * np.random.randn(len(x_obs))
+    noise_y = 0.01 * y_obs * np.random.randn(len(y_obs))
     # Add the noise to the observed values
     x_obs_noise = [x_obs[ind] + noise_x[ind] for ind in range(len(x_obs))]
     y_obs_noise = [y_obs[ind] + noise_y[ind] for ind in range(len(y_obs))]
@@ -79,7 +79,7 @@ if __name__=="__main__":
 
     # Physic loss training points
     # Tensor of times to train PINN through physics loss
-    t_physics = torch.linspace(t0, tf, 500).view(-1, 1).requires_grad_(True)
+    t_physics = torch.linspace(t0, tf, 800).view(-1, 1).requires_grad_(True)
 
     # Training setup
     # Initialize PINN
@@ -95,9 +95,13 @@ if __name__=="__main__":
     lambda_weight = 100
     # Number of training iterations
     max_it = 30000
+    # Distance to target parameters needed to stop training
+    tol = 0.05
+    # Target parameters
+    a_t, b_t, c_t, d_t = 1,1,1,1
 
     # Training loop
-    for i in tqdm.tqdm(range(max_it)):
+    for i in range(max_it):
         # Reset gradient to zero
         optimiser.zero_grad()
         # -----------------------
@@ -128,6 +132,15 @@ if __name__=="__main__":
         # Backpropagate joint loss, take optimiser step
         loss.backward()
         optimiser.step()
+
+        # Check if parameters distance within tolerance
+        if abs(a.item() - a_t) < tol and abs(b.item() - b_t) < tol and abs(c.item() - c_t) < tol and abs(d.item() - d_t) < tol:
+            print(f"Stopping training: parameters within tolerance after {i+1} iterations.")
+            break
+
+        # Logging
+        if i % 5000 == 0:  
+            print(f"Iteration {i}: a = {a.item()}, b = {b.item()}, c = {c.item()}, d = {d.item()}")
     
     print(a.item())
     print(b.item())
