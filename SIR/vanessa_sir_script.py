@@ -137,7 +137,7 @@ def normalize(wei):
     normalized=wei/np.sum(wei)
     return normalized  
 
-def principal(epsilons,listaparametros,N,data1):
+def principal(epsilons,listaparametros,N,data1, tol_target):
    # accepted_distances = np.loadtxt('smc/distances_{}_{}_{}_{}.out'.format(model,sto,gamma,prior_label))
     T=len(epsilons)
     weight=np.zeros((T,N),float)
@@ -202,6 +202,16 @@ def principal(epsilons,listaparametros,N,data1):
         if i!=0:
            weight[i,:]=normalize(weight[i,:])
            #print('weight[i,:] normalized',weight[i,:])
+        
+
+        # Check convergence using tolerance targets for beta and gamma
+        best_index = np.argmin(dist[i, :])
+        best_params = sample[i, best_index]
+        if all(abs(best_params[k] - listaparametros[k]['target_value']) < tol_target[k] for k in range(len(best_params))):
+            print(f"Converged to within tolerance at iteration {i + 1}.")
+            print(f"Best parameters: Beta: {best_params[0]}, Gamma: {best_params[1]}")
+            return sample, weight, dist, data2, True  # Return with a flag indicating early stopping
+    
         #pars = np.loadtxt('smc_van/pars_{}.out'.format(i))
         #weights = np.loadtxt('smc_van/weights_{}.out'.format(i))
         #np.savetxt('smc_van/pars_{}.out'.format(i), sample[T-1,:])
@@ -210,7 +220,7 @@ def principal(epsilons,listaparametros,N,data1):
     ##print('sample',sample[T-1,N-1])
     ##print('weight',weight[T-1])
     #print('dist',dist[T-1])
-    return sample, weight, dist,data2
+    return sample, weight, dist,data2, False
 
 if __name__ == "__main__":
     # Total population, N.
@@ -244,17 +254,23 @@ if __name__ == "__main__":
     epsilons=[60, 50, 40, 20, 10, 5,2,1.5,1,0.5]
 
     params_SIR = [
-    {'name' : 'beta','lower_limit':0,'upper_limit':10.0},#infection rate
-    {'name' : 'gamma','lower_limit':0,'upper_limit':10.0}# recovery rate
+    {'name': 'beta', 'lower_limit': 0, 'upper_limit': 10.0, 'target_value': betaI},
+    {'name': 'gamma', 'lower_limit': 0, 'upper_limit': 10.0, 'target_value': gammaI}
     ]
 
-    sample,weight,dist,data2=principal(epsilons,params_SIR,100,SIR) 
+    # Define tolerance distance to target parameters for early stopping
+    tol_target = [0.01, 0.01]
 
-    # Access the best parameter values
-    final_samples = sample[-1]  # Last set of samples
-    final_distances = dist[-1]  # Last set of distances
-    best_index = np.argmin(final_distances) 
-    # Extract the best parameter set
-    best_params = final_samples[best_index]
-    # Print best beta and gamma
-    print(f"Best Beta: {best_params[0]}, Best Gamma: {best_params[1]}")
+    sample,weight,dist,data2, stopped_early=principal(epsilons,params_SIR,100,SIR, tol_target) 
+
+    # Check if stopped early
+    if stopped_early:
+        print("Algorithm stopped early due to convergence.")
+    else:
+        # Process results if the algorithm completes all iterations
+        final_samples = sample[-1]  # Last set of samples
+        final_distances = dist[-1]  # Last set of distances
+        best_index = np.argmin(final_distances)
+        # Extract the best parameter set
+        best_params = final_samples[best_index]
+        print(f"Best Beta: {best_params[0]}, Best Gamma: {best_params[1]}")
