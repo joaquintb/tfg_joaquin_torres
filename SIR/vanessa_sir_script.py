@@ -11,6 +11,8 @@ import scipy
 import scipy.integrate as integrate
 from scipy.integrate import odeint
 import math
+import time
+import seaborn as sns
 
 # SIR, no latent period, but with reocevered becoming suspitible again
 def deriv_SIR(y, t, N, betaI, gammaI):
@@ -147,6 +149,9 @@ def principal(epsilons,listaparametros,N,data1, tol_target):
     X0=[S0,I0,R0]
     t = np.linspace(0, finalT, 10)
     #t=np.linspace(0.,10,10)
+
+    start_time = time.time()
+
     for i in range(T):
         count=0
         counti=0
@@ -208,9 +213,10 @@ def principal(epsilons,listaparametros,N,data1, tol_target):
         best_index = np.argmin(dist[i, :])
         best_params = sample[i, best_index]
         if all(abs(best_params[k] - listaparametros[k]['target_value']) < tol_target[k] for k in range(len(best_params))):
-            print(f"Converged to within tolerance at iteration {i + 1}.")
-            print(f"Best parameters: Beta: {best_params[0]}, Gamma: {best_params[1]}")
-            return sample, weight, dist, data2, True  # Return with a flag indicating early stopping
+            #print(f"Converged to within tolerance at iteration {i + 1}.")
+            #print(f"Best parameters: Beta: {best_params[0]}, Gamma: {best_params[1]}")
+            end_time = time.time()
+            return sample, weight, dist, data2, True, end_time - start_time  # Return with a flag indicating early stopping
     
         #pars = np.loadtxt('smc_van/pars_{}.out'.format(i))
         #weights = np.loadtxt('smc_van/weights_{}.out'.format(i))
@@ -220,7 +226,34 @@ def principal(epsilons,listaparametros,N,data1, tol_target):
     ##print('sample',sample[T-1,N-1])
     ##print('weight',weight[T-1])
     #print('dist',dist[T-1])
-    return sample, weight, dist,data2, False
+    end_time = time.time()
+    return sample, weight, dist,data2, False, end_time - start_time
+
+def stat_report(execution_times):
+    mean = np.mean(execution_times)
+    sd = np.std(execution_times)
+    median = np.median(execution_times)
+    iqr = np.percentile(execution_times, 75) - np.percentile(execution_times, 25)
+
+    print('Printing statistical report of execution time: ')
+    print("Mean:", mean)
+    print("Standard Deviation:", sd)
+    print("Median:", median)
+    print("Interquartile Range:", iqr)
+
+    plt.figure(figsize=(10, 4))
+    plt.subplot(1, 2, 1)
+    sns.histplot(execution_times, color='blue')
+    plt.title("Histogram of Execution Times")
+    plt.xlabel("Execution Time (s)")
+    plt.ylabel("Frequency")
+
+    plt.subplot(1, 2, 2)
+    plt.boxplot(execution_times, vert=False)
+    plt.title("Box Plot of Execution Times")
+    plt.xlabel("Execution Time (s)")
+
+    plt.savefig('./SIR/sim_results/executon_time_abc.png')
 
 if __name__ == "__main__":
     # Total population, N.
@@ -259,18 +292,14 @@ if __name__ == "__main__":
     ]
 
     # Define tolerance distance to target parameters for early stopping
-    tol_target = [0.01, 0.01]
+    tol_target = [0.1, 0.1]
 
-    sample,weight,dist,data2, stopped_early=principal(epsilons,params_SIR,100,SIR, tol_target) 
+    num_sim = 100
+    exec_times = []
 
-    # Check if stopped early
-    if stopped_early:
-        print("Algorithm stopped early due to convergence.")
-    else:
-        # Process results if the algorithm completes all iterations
-        final_samples = sample[-1]  # Last set of samples
-        final_distances = dist[-1]  # Last set of distances
-        best_index = np.argmin(final_distances)
-        # Extract the best parameter set
-        best_params = final_samples[best_index]
-        print(f"Best Beta: {best_params[0]}, Best Gamma: {best_params[1]}")
+    for sim_id in range(1, num_sim+1):
+        print(f'SIM {sim_id}')
+        sample,weight,dist,data2, stopped_early, exec_time =principal(epsilons,params_SIR,100,SIR, tol_target) 
+        exec_times.append(exec_time)
+
+    stat_report(exec_times)

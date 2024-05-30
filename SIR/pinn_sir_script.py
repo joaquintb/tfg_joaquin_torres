@@ -152,7 +152,7 @@ def stat_report(execution_times):
     plt.title("Box Plot of Execution Times")
     plt.xlabel("Execution Time (s)")
 
-    plt.savefig('./SIR/sim_results/executon_time.png')
+    plt.savefig('./SIR/sim_results/executon_time_pinn.png')
 
 if __name__=="__main__": 
     # Defining the problem
@@ -197,7 +197,7 @@ if __name__=="__main__":
         ax1.plot(betas)
         # Plot the gamma trajectory for this simulation on the second subplot
         ax2.plot(gammas)
-        print(f'SIM {sim_id}: beta0={betas[0]}, gamma0={gammas[0]} betaF={betas[-1]}, gammaF={gammas[-1]}, t={exec_time} seconds, stop={stopped}')
+        # print(f'SIM {sim_id}: beta0={betas[0]}, gamma0={gammas[0]} betaF={betas[-1]}, gammaF={gammas[-1]}, t={exec_time} seconds, stop={stopped}')
 
     # Configure the first subplot (betas)
     ax1.set_title("Beta values")
@@ -216,6 +216,6 @@ if __name__=="__main__":
     ax2.hlines(gamma, 0, largest_it, color="tab:green", linestyles='dashed', label="True Gamma value", lw=6)
     ax2.legend(loc="best")
     # Show the plot
-    plt.savefig('./SIR/sim_results/param_trajec.png')
+    plt.savefig('./SIR/sim_results/param_trajec_pinn.png')
 
     stat_report(exec_times)
