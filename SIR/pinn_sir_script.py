@@ -8,6 +8,8 @@ import torch
 import torch.nn as nn
 import tqdm as tqdm
 from scipy.integrate import odeint
+import time
+import matplotlib.pyplot as plt
 
 # Aux function to return RHS of ODE system
 def SIR(x, t, N, beta, gamma):
@@ -42,25 +44,8 @@ class FCN(nn.Module):
         I_output = self.fce_I(x)
         R_output = self.fce_R(x)
         return S_output, I_output, R_output
-
-if __name__=="__main__": 
-    # Defining the problem
-    N = 100  # Total population
-    # Initial number of infected and recovered individuals
-    I0, R0 = 1, 0
-    # Everyone else, S0, is susceptible to infection initially
-    S0 = N - I0 - R0
-    # Initial state of the system
-    X0 = [S0, I0, R0]
-    # Parameters
-    beta, gamma = 1.5, 0.5
-    # A grid of time points (in days)
-    finalT = 17.0
-    t  = np.linspace(0, finalT, 100)
-    # Solving the problem numerically (via odeint numerical solver)
-    result = odeint(SIR, X0, t, args=(N, beta, gamma))
-    S, I, R = result.T
-
+    
+def get_obs_data(S,I,R):
     # Generating observations
     # Generate 10 equispaced time locations in the domain for fair comparison with ABC-SMC
     obs_ind = np.linspace(0, len(t) - 1, 10, dtype=int)
@@ -84,9 +69,10 @@ if __name__=="__main__":
     # Tensor with noisy observations for R
     u_obs_R = torch.tensor(R_obs_noise,  dtype=torch.float32).view(-1,1)
 
-    # Tensor of times to train PINN through physics loss
-    t_physics = torch.linspace(0, finalT, 500).view(-1, 1).requires_grad_(True)
+    return t_obs, u_obs_S, u_obs_I, u_obs_R
 
+# Function to simulate training the PINN
+def simulate(t_obs, u_obs_S, u_obs_I, u_obs_R, t_physics, N, target_params, tol, max_its, lambda_weight):
     # Training setup
     # Initialize PINN
     pinn = FCN(1,1,32,3)
@@ -95,15 +81,13 @@ if __name__=="__main__":
     gamma = torch.nn.Parameter(torch.empty(1).uniform_(0, 10), requires_grad=True)
     # Define optimiser and make problem parameters learnable
     optimiser = torch.optim.Adam(list(pinn.parameters())+[beta,gamma],lr=1e-2)
-    # Hyperparameter deciding weight given to fitting observational data
-    lambda_weight = 10
-    # Number of training iterations
-    max_its = 10000
-    # Distance to target parameters needed to stop training
-    tol = 0.01
-    beta_t, gamma_t = 1.5, 0.5 # Target params
+    beta_t, gamma_t = target_params[0], target_params[1] # Target params
+    betas, gammas = [], [] # To keep track of progress
 
-    for i in range(max_its):
+    # Start timing
+    start_time = time.time()
+
+    for it in range(max_its):
         # Reset gradient to zero
         optimiser.zero_grad()
         # -----------------------
@@ -133,14 +117,70 @@ if __name__=="__main__":
         # Backpropagate joint loss, take optimiser step
         loss.backward()
         optimiser.step()
-
+        # Add current parameter values to lists
+        betas.append(beta.item())
+        gammas.append(gamma.item())
         # Check if parameter distance within tolerance
         if abs(beta.item() - beta_t) < tol and abs(gamma.item() - gamma_t) < tol:
-            print(f"Stopping training: parameters within tolerance after {i+1} iterations.")
-            break
-    
-        # Logging
-        if i % 1000 == 0:  
-            print(f"Iteration {i}: beta = {beta.item()}, gamma = {gamma.item()}")
-    print(beta.item())
-    print(gamma.item())
+            end_time = time.time()  # End timing here if early stop
+            return betas, gammas, it, True, end_time - start_time  # Return elapsed time
+    end_time = time.time()  # End timing after loop if no early stop
+    return betas, gammas, it, False, end_time - start_time
+
+if __name__=="__main__": 
+    # Defining the problem
+    N = 100  # Total population
+    # Initial number of infected and recovered individuals
+    I0, R0 = 1, 0
+    # Everyone else, S0, is susceptible to infection initially
+    S0 = N - I0 - R0
+    # Initial state of the system
+    X0 = [S0, I0, R0]
+    # Parameters
+    beta, gamma = 1.5, 0.5
+    # A grid of time points (in days)
+    finalT = 17.0
+    t  = np.linspace(0, finalT, 100)
+    # Solving the problem numerically (via odeint numerical solver)
+    result = odeint(SIR, X0, t, args=(N, beta, gamma))
+    S, I, R = result.T
+    # Get observational data (noisy)
+    t_obs, u_obs_S, u_obs_I, u_obs_R = get_obs_data(S,I,R)
+    # Tensor of times to train PINN through physics loss
+    num_phys_locs = 750
+    t_physics = torch.linspace(0, finalT, num_phys_locs).view(-1, 1).requires_grad_(True)
+    # Hyperparameter deciding weight given to fitting observational data
+    lambda_weight = 10
+    # Simulation setup
+    num_sim = 3 # Number of simulations to run
+    tol = 0.1 # Tolerance to target needed to stop training
+    max_its = 10000
+    largest_it = -1
+    # Set up a figure with two subplots: one for betas and one for gammas
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 12))
+    fig.suptitle("Parameter trajectories for all simulations")
+    for sim_id in range(1,num_sim+1):
+        betas, gammas, it, stopped, exec_time = simulate(t_obs, u_obs_S, u_obs_I, u_obs_R, t_physics, N, [beta,gamma], tol, max_its, lambda_weight)
+        largest_it = it if it > largest_it else largest_it
+        # Plot the beta trajectory for this simulation on the first subplot
+        ax1.plot(betas)
+        # Plot the gamma trajectory for this simulation on the second subplot
+        ax2.plot(gammas)
+        print(f'SIM {sim_id}: beta0={betas[0]}, gamma0={gammas[0]} betaF={betas[-1]}, gammaF={gammas[-1]}, t={exec_time} seconds, stop={stopped}')
+
+    # Configure the first subplot (betas)
+    ax1.set_title("Beta values")
+    ax1.set_xlabel("Training step")
+    ax1.set_ylabel("Beta value")
+    ax1.set_xlim(0, largest_it)
+    ax1.hlines(beta, 0, len(betas), color="tab:green", linestyles='dashed', label="True Beta value", lw=4)
+    # Configure the second subplot (gammas)
+    ax2.set_title("Gamma values")
+    ax2.set_xlabel("Training step")
+    ax2.set_ylabel("Gamma value")
+    ax2.set_xlim(0, largest_it)
+    ax2.hlines(gamma, 0, len(gammas), color="tab:green", linestyles='dashed', label="True Gamma value", lw=4)
+    # Adjust layout to prevent overlap and ensure clarity
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust the rectangle in which to fit subplots
+    # Show the plot
+    plt.show()
