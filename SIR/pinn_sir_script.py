@@ -10,6 +10,7 @@ import tqdm as tqdm
 from scipy.integrate import odeint
 import time
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Aux function to return RHS of ODE system
 def SIR(x, t, N, beta, gamma):
@@ -127,6 +128,32 @@ def simulate(t_obs, u_obs_S, u_obs_I, u_obs_R, t_physics, N, target_params, tol,
     end_time = time.time()  # End timing after loop if no early stop
     return betas, gammas, it, False, end_time - start_time
 
+def stat_report(execution_times):
+    mean = np.mean(execution_times)
+    sd = np.std(execution_times)
+    median = np.median(execution_times)
+    iqr = np.percentile(execution_times, 75) - np.percentile(execution_times, 25)
+
+    print('Printing statistical report of execution time: ')
+    print("Mean:", mean)
+    print("Standard Deviation:", sd)
+    print("Median:", median)
+    print("Interquartile Range:", iqr)
+
+    plt.figure(figsize=(10, 4))
+    plt.subplot(1, 2, 1)
+    sns.histplot(execution_times, color='blue')
+    plt.title("Histogram of Execution Times")
+    plt.xlabel("Execution Time (s)")
+    plt.ylabel("Frequency")
+
+    plt.subplot(1, 2, 2)
+    plt.boxplot(execution_times, vert=False)
+    plt.title("Box Plot of Execution Times")
+    plt.xlabel("Execution Time (s)")
+
+    plt.savefig('./SIR/sim_results/executon_time.png')
+
 if __name__=="__main__": 
     # Defining the problem
     N = 100  # Total population
@@ -152,9 +179,10 @@ if __name__=="__main__":
     # Hyperparameter deciding weight given to fitting observational data
     lambda_weight = 10
     # Simulation setup
-    num_sim = 3 # Number of simulations to run
+    num_sim = 100 # Number of simulations to run
     tol = 0.1 # Tolerance to target needed to stop training
     max_its = 10000
+
     largest_it = -1
     # Set up a figure with two subplots: one for betas and one for gammas
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 12))
@@ -176,17 +204,18 @@ if __name__=="__main__":
     ax1.set_xlabel("Training step")
     ax1.set_ylabel("Beta value")
     ax1.set_xlim(0, largest_it)
-    ax1.hlines(beta, 0, len(betas), color="tab:green", linestyles='dashed', label="True Beta value", lw=4)
+    ax1.set_ylim(-2,12)
+    ax1.hlines(beta, 0, largest_it, color="tab:green", linestyles='dashed', label="True Beta value", lw=6)
+    ax1.legend(loc="best")
     # Configure the second subplot (gammas)
     ax2.set_title("Gamma values")
     ax2.set_xlabel("Training step")
     ax2.set_ylabel("Gamma value")
     ax2.set_xlim(0, largest_it)
-    ax2.hlines(gamma, 0, len(gammas), color="tab:green", linestyles='dashed', label="True Gamma value", lw=4)
-    # Adjust layout to prevent overlap and ensure clarity
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust the rectangle in which to fit subplots
+    ax2.set_ylim(-2,12)
+    ax2.hlines(gamma, 0, largest_it, color="tab:green", linestyles='dashed', label="True Gamma value", lw=6)
+    ax2.legend(loc="best")
     # Show the plot
-    plt.show()
+    plt.savefig('./SIR/sim_results/param_trajec.png')
 
-    print(exec_times)
-    # print(f'Mean execution time: {sum(exec_time)/len(exec_time)} seconds')
+    stat_report(exec_times)
