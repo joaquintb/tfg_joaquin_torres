@@ -158,9 +158,12 @@ if __name__=="__main__":
     largest_it = -1
     # Set up a figure with two subplots: one for betas and one for gammas
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 12))
+    # Execution times vectors
+    exec_times = []
     fig.suptitle("Parameter trajectories for all simulations")
     for sim_id in range(1,num_sim+1):
         betas, gammas, it, stopped, exec_time = simulate(t_obs, u_obs_S, u_obs_I, u_obs_R, t_physics, N, [beta,gamma], tol, max_its, lambda_weight)
+        exec_times.append(exec_time)
         largest_it = it if it > largest_it else largest_it
         # Plot the beta trajectory for this simulation on the first subplot
         ax1.plot(betas)
@@ -184,3 +187,6 @@ if __name__=="__main__":
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust the rectangle in which to fit subplots
     # Show the plot
     plt.show()
+
+    print(exec_times)
+    # print(f'Mean execution time: {sum(exec_time)/len(exec_time)} seconds')
