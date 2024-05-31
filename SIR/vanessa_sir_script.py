@@ -248,7 +248,7 @@ def stat_report(execution_times):
     plt.title("Box Plot of Execution Times")
     plt.xlabel("Execution Time (s)")
 
-    plt.savefig('./SIR/sim_results/execution_time_abc.png')
+    plt.savefig('.sim_results/execution_time_abc.png')
 
 if __name__ == "__main__":
     # Total population, N.
@@ -293,7 +293,6 @@ if __name__ == "__main__":
     exec_times = []
 
     for sim_id in tqdm.tqdm(range(1, num_sim+1)):
-        print(f'SIM {sim_id}')
         sample,weight,dist,data2, stopped_early, exec_time =principal(epsilons,params_SIR,100,SIR, tol_target) 
         exec_times.append(exec_time)
 
