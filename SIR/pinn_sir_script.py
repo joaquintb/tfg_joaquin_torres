@@ -46,7 +46,7 @@ class FCN(nn.Module):
         R_output = self.fce_R(x)
         return S_output, I_output, R_output
     
-def get_obs_data(S,I,R):
+def get_obs_data(t, S,I,R):
     # Generating observations
     # Generate 10 equispaced time locations in the domain for fair comparison with ABC-SMC
     obs_ind = np.linspace(0, len(t) - 1, 10, dtype=int)
@@ -84,6 +84,8 @@ def simulate(t_obs, u_obs_S, u_obs_I, u_obs_R, t_physics, N, target_params, tol,
     optimiser = torch.optim.Adam(list(pinn.parameters())+[beta,gamma],lr=1e-2)
     beta_t, gamma_t = target_params[0], target_params[1] # Target params
     betas, gammas = [], [] # To keep track of progress
+    beta_times, gamma_times = [], [] # To keep track of execution time at each iteration (for plotting purposes)
+    beta_done, gamma_done = False, False # Keep track of state of each parameter individually
 
     # Start timing
     start_time = time.time()
@@ -118,15 +120,25 @@ def simulate(t_obs, u_obs_S, u_obs_I, u_obs_R, t_physics, N, target_params, tol,
         # Backpropagate joint loss, take optimiser step
         loss.backward()
         optimiser.step()
-        # Add current parameter values to lists
-        betas.append(beta.item())
-        gammas.append(gamma.item())
-        # Check if parameter distance within tolerance
-        if abs(beta.item() - beta_t) < tol and abs(gamma.item() - gamma_t) < tol:
-            end_time = time.time()  # End timing here if early stop
-            return betas, gammas, it, True, end_time - start_time  # Return elapsed time
+        # Record values, stop recording invidually if one of them is done
+        if not beta_done:
+            curr_time = time.time()
+            beta_times.append(curr_time-start_time)
+            betas.append(beta.item())
+            beta_done = True if abs(beta.item() - beta_t) < tol else False
+        if not gamma_done:
+            curr_time = time.time()
+            gamma_times.append(curr_time - start_time)
+            gammas.append(gamma.item())
+            gamma_done = True if abs(gamma.item() - gamma_t) < tol else False
+        if beta_done and gamma_done:
+            end_time = time.time()
+            final_time = end_time - start_time
+            return betas, gammas, it, True, final_time, beta_times, gamma_times
+    
     end_time = time.time()  # End timing after loop if no early stop
-    return betas, gammas, it, False, end_time - start_time
+    final_time = end_time - start_time
+    return betas, gammas, it, False, final_time, beta_times, gamma_times
 
 def stat_report(execution_times):
     mean = np.mean(execution_times)
@@ -152,7 +164,7 @@ def stat_report(execution_times):
     plt.title("Box Plot of Execution Times")
     plt.xlabel("Execution Time (s)")
 
-    plt.savefig('./SIR/sim_results/executon_time_pinn.png')
+    plt.savefig('./sim_results/execution_time_pinn.png')
 
 if __name__=="__main__": 
     # Defining the problem
@@ -172,7 +184,7 @@ if __name__=="__main__":
     result = odeint(SIR, X0, t, args=(N, beta, gamma))
     S, I, R = result.T
     # Get observational data (noisy)
-    t_obs, u_obs_S, u_obs_I, u_obs_R = get_obs_data(S,I,R)
+    t_obs, u_obs_S, u_obs_I, u_obs_R = get_obs_data(t, S,I,R)
     # Tensor of times to train PINN through physics loss
     num_phys_locs = 750
     t_physics = torch.linspace(0, finalT, num_phys_locs).view(-1, 1).requires_grad_(True)
@@ -183,39 +195,51 @@ if __name__=="__main__":
     tol = 0.1 # Tolerance to target needed to stop training
     max_its = 10000
 
-    largest_it = -1
+    #                                    SIMULATION LOOP
+    # --------------------------------------------------------------------------------------------------
     # Set up a figure with two subplots: one for betas and one for gammas
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 12))
-    # Execution times vectors
-    exec_times = []
+    total_exec_times, last_beta_times, all_gamma_times = [], [], []
     fig.suptitle("Parameter trajectories for all simulations")
-    for sim_id in range(1,num_sim+1):
-        betas, gammas, it, stopped, exec_time = simulate(t_obs, u_obs_S, u_obs_I, u_obs_R, t_physics, N, [beta,gamma], tol, max_its, lambda_weight)
-        exec_times.append(exec_time)
-        largest_it = it if it > largest_it else largest_it
+    for sim_id in tqdm.tqdm(range(1,num_sim+1)):
+        betas, gammas, it, stopped, total_exec_time, beta_times, gamma_times = simulate(t_obs, u_obs_S, u_obs_I, u_obs_R, t_physics, N, [beta,gamma], tol, max_its, lambda_weight)
+        total_exec_times.append(total_exec_time)
+        last_beta_times.append(beta_times[-1]) # Keep track of last beta time
+        all_gamma_times.append(gamma_times[-1]) 
         # Plot the beta trajectory for this simulation on the first subplot
-        ax1.plot(betas)
+        ax1.plot(beta_times, betas)
         # Plot the gamma trajectory for this simulation on the second subplot
-        ax2.plot(gammas)
-        # print(f'SIM {sim_id}: beta0={betas[0]}, gamma0={gammas[0]} betaF={betas[-1]}, gammaF={gammas[-1]}, t={exec_time} seconds, stop={stopped}')
+        ax2.plot(gamma_times, gammas)
+    # --------------------------------------------------------------------------------------------------
 
+    #                                    PLOTTING PARAM TRAJ
+    # --------------------------------------------------------------------------------------------------
     # Configure the first subplot (betas)
     ax1.set_title("Beta values")
-    ax1.set_xlabel("Training step")
+    ax1.set_xlabel("Time (s)")
     ax1.set_ylabel("Beta value")
-    ax1.set_xlim(0, largest_it)
+    ax1.set_xlim(0, max(last_beta_times))
     ax1.set_ylim(-2,12)
-    ax1.hlines(beta, 0, largest_it, color="tab:green", linestyles='dashed', label="True Beta value", lw=6)
+    # Adding horizontal lines for the tolerance range around 'a'
+    ax1.axhline(y=beta + tol, color='tab:blue', linestyle='dashed', linewidth=1, label=f'beta + tol')
+    ax1.axhline(y=beta - tol, color='tab:red', linestyle='dashed', linewidth=1, label=f'beta - tol')
+    # Shading the area between 'a + tol' and 'a - tol'
+    ax1.fill_between([0, max(last_beta_times)], beta - tol, beta + tol, color='green', alpha=0.3, label='Convergence region')
     ax1.legend(loc="best")
     # Configure the second subplot (gammas)
     ax2.set_title("Gamma values")
-    ax2.set_xlabel("Training step")
+    ax2.set_xlabel("Time (s)")
     ax2.set_ylabel("Gamma value")
-    ax2.set_xlim(0, largest_it)
+    ax2.set_xlim(0, max(all_gamma_times))
     ax2.set_ylim(-2,12)
-    ax2.hlines(gamma, 0, largest_it, color="tab:green", linestyles='dashed', label="True Gamma value", lw=6)
+    ax2.axhline(y=gamma + tol, color='tab:blue', linestyle='dashed', linewidth=1, label=f'gamma + tol')
+    ax2.axhline(y=gamma - tol, color='tab:red', linestyle='dashed', linewidth=1, label=f'gamma - tol')
+    # Shading the area between 'a + tol' and 'a - tol'
+    ax2.fill_between([0, max(all_gamma_times)], gamma - tol, gamma + tol, color='green', alpha=0.3, label='Convergence region')
     ax2.legend(loc="best")
     # Show the plot
-    plt.savefig('./SIR/sim_results/param_trajec_pinn.png')
+    plt.savefig('./sim_results/param_trajec_pinn.png')
+    # --------------------------------------------------------------------------------------------------
 
-    stat_report(exec_times)
+    # Generate statistical report on execution times
+    stat_report(total_exec_times)

@@ -1,18 +1,13 @@
 import numpy as np
-from scipy.stats import norm, uniform, multivariate_normal
-from scipy.optimize import minimize
-from scipy.special import logsumexp
-import sys,ast
+from scipy.stats import uniform, multivariate_normal
+import sys
 from random import choices,seed,random
-from functools import partial
-import os
 import matplotlib.pyplot as plt
 import scipy
-import scipy.integrate as integrate
 from scipy.integrate import odeint
-import math
 import time
 import seaborn as sns
+import tqdm as tqdm
 
 # SIR, no latent period, but with reocevered becoming suspitible again
 def deriv_SIR(y, t, N, betaI, gammaI):
@@ -253,7 +248,7 @@ def stat_report(execution_times):
     plt.title("Box Plot of Execution Times")
     plt.xlabel("Execution Time (s)")
 
-    plt.savefig('./SIR/sim_results/executon_time_abc.png')
+    plt.savefig('./SIR/sim_results/execution_time_abc.png')
 
 if __name__ == "__main__":
     # Total population, N.
@@ -297,7 +292,7 @@ if __name__ == "__main__":
     num_sim = 100
     exec_times = []
 
-    for sim_id in range(1, num_sim+1):
+    for sim_id in tqdm.tqdm(range(1, num_sim+1)):
         print(f'SIM {sim_id}')
         sample,weight,dist,data2, stopped_early, exec_time =principal(epsilons,params_SIR,100,SIR, tol_target) 
         exec_times.append(exec_time)

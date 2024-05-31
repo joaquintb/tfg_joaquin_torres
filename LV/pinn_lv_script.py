@@ -7,6 +7,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import tqdm as tqdm
+import matplotlib.pyplot as plt
+import time as time
 
 # RK4 to numerically solve the LV system (Vanessa)
 def RK4(f, x0, t0, tf, num_points):
@@ -27,7 +29,6 @@ def RK4(f, x0, t0, tf, num_points):
 
 # PINN model definition
 class FCN(nn.Module):
-    "Defines a standard fully-connected network in PyTorch with sinusoidal activation"
     def __init__(self, N_INPUT, N_OUTPUT, N_HIDDEN, N_LAYERS):
         super().__init__()
         activation = nn.Tanh
@@ -46,24 +47,13 @@ class FCN(nn.Module):
         prey_output = self.fce_prey(x)
         predator_output = self.fce_predator(x)
         return prey_output, predator_output
-
-if __name__=="__main__": 
-    # Setup
-    # Defining the problem
-    a,b,c,d = 1,1,1,1
-    f=lambda t, x: np.array([a*x[0] - b*x[0]*x[1], d*x[0]*x[1] - c*x[1]])
-    x0 = np.array([0.5,1]) # IC
-    # Solving the problem
-    t0, tf = 0, 15
-    num_points = 1000
-    x, t = RK4(f, x0, t0, tf, num_points)
-
-    # Generating observations
+    
+def get_obs_data(t,x,y):
     # Generate 8 equispaced time locations in the domain for fair comparison with ABC-SMC
     obs_ind = np.linspace(0, len(t) - 1, 8, dtype=int)
     # Get solution at those time locations
-    x_obs = np.array([x[0][ind] for ind in obs_ind])
-    y_obs = np.array([x[1][ind] for ind in obs_ind])
+    x_obs = np.array([x[ind] for ind in obs_ind])
+    y_obs = np.array([y[ind] for ind in obs_ind])
     # Generate Gaussian noise to add to the observations
     noise_x = 0.01 * x_obs * np.random.randn(len(x_obs))
     noise_y = 0.01 * y_obs * np.random.randn(len(y_obs))
@@ -77,11 +67,9 @@ if __name__=="__main__":
     # Tensor with noisy observations for predator
     u_obs_y = torch.tensor(y_obs_noise,  dtype=torch.float32).view(-1,1)
 
-    # Physic loss training points
-    # Tensor of times to train PINN through physics loss
-    t_physics = torch.linspace(t0, tf, 800).view(-1, 1).requires_grad_(True)
+    return t_obs, u_obs_x, u_obs_y
 
-    # Training setup
+def simulate(t_obs, u_obs_x, u_obs_y, t_physics, target_params, tol, max_its, lambda_weight):
     # Initialize PINN
     pinn = FCN(1,1,32,3) 
     # Sample initial problems parameters from uniform 0 to 10 for comparison to be fair
@@ -91,17 +79,15 @@ if __name__=="__main__":
     d = torch.nn.Parameter(torch.empty(1).uniform_(0, 10), requires_grad=True)
     # Define optimiser and make problem parameters learnable
     optimiser = torch.optim.Adam(list(pinn.parameters())+[a,b,c,d],lr=1e-3)
-    # Hyperparameter deciding weight given to fitting observational data
-    lambda_weight = 100
-    # Number of training iterations
-    max_it = 30000
-    # Distance to target parameters needed to stop training
-    tol = 0.05
-    # Target parameters
-    a_t, b_t, c_t, d_t = 1,1,1,1
+    a_t, b_t, c_t, d_t = target_params[0], target_params[1], target_params[2], target_params[3]
+    a_s, b_s, c_s, d_s = [], [], [], [] # To keep track of progress
+    times = [] # To keep track of execution time at each iteration (for plotting purposes)
+
+    # Start timing
+    start_time = time.time()
 
     # Training loop
-    for i in range(max_it):
+    for it in range(max_its):
         # Reset gradient to zero
         optimiser.zero_grad()
         # -----------------------
@@ -132,17 +118,67 @@ if __name__=="__main__":
         # Backpropagate joint loss, take optimiser step
         loss.backward()
         optimiser.step()
-
+        # Record current time and parameter values
+        current_time = time.time() - start_time
+        times.append(current_time)
+        a_s.append(a.item())
+        b_s.append(b.item())
+        c_s.append(c.item())
+        d_s.append(d.item())
         # Check if parameters distance within tolerance
         if abs(a.item() - a_t) < tol and abs(b.item() - b_t) < tol and abs(c.item() - c_t) < tol and abs(d.item() - d_t) < tol:
-            print(f"Stopping training: parameters within tolerance after {i+1} iterations.")
-            break
+            end_time = time.time() # End timing, early stop
+            return a_s, b_s, c_s, d_s, it, True, (end_time - start_time), times
+    end_time = time.time() # End timing after loop if no early stop
+    return a_s, b_s, c_s, d_s, it, False, (end_time - start_time), times
 
-        # Logging
-        if i % 5000 == 0:  
-            print(f"Iteration {i}: a = {a.item()}, b = {b.item()}, c = {c.item()}, d = {d.item()}")
-    
-    print(a.item())
-    print(b.item())
-    print(c.item())
-    print(d.item())
+if __name__=="__main__": 
+    # Setup
+    # Defining the problem
+    a,b,c,d = 1,1,1,1
+    f=lambda t, x: np.array([a*x[0] - b*x[0]*x[1], d*x[0]*x[1] - c*x[1]])
+    x0 = np.array([0.5,1]) # IC
+    # Solving the problem
+    t0, tf = 0, 15
+    num_points = 800
+    x, t = RK4(f, x0, t0, tf, num_points)
+    # Get observational data from the solution
+    t_obs, u_obs_x, u_obs_y = get_obs_data(t, x[0], x[1])
+    # Tensor of times to train PINN through physics loss
+    num_phys_locs = 1000
+    t_physics = torch.linspace(t0, tf, num_phys_locs).view(-1, 1).requires_grad_(True)
+    # Hyperparameter deciding weight given to fitting observational data
+    lambda_weight = 10
+    # Simulation setup
+    num_sim = 3 # Number of simulations to run
+    tol = 3 # Tolerance to target needed to stop training
+    max_its = 20000
+    # Training setup
+    # Target parameters
+    target_params = [a,b,c,d]
+
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, figsize=(10, 12))
+    total_exec_times = [] # Keep track of execution time of each simulation
+    for sim_id in range(1, num_sim+1):
+        a_s, b_s, c_s, d_s, it, stopped, total_exec_time, it_exec_times = simulate(t_obs, u_obs_x, u_obs_y, t_physics, target_params, tol, max_its, lambda_weight)
+        print(f'SIM {sim_id}: a={a_s[-1]}, b={b_s[-1]}, c={c_s[-1]}, d={d_s[-1]}, t = {total_exec_time} s')
+        # Plot trajectories in execution time of each parameter for current simulation
+        ax1.plot(it_exec_times, a_s)
+        # ax2.plot(it_exec_times, b_s)
+        # ax3.plot(it_exec_times, c_s)
+        # ax4.plot(it_exec_times, d_s)
+        total_exec_times.append(total_exec_time)
+    # Configure the first subplot (param a)
+    ax1.set_title("a values")
+    ax1.set_xlabel("Time (s)")
+    ax1.set_ylabel("a value")
+    ax1.set_xlim(0, max(total_exec_times))
+    ax1.set_ylim(-2,12)
+    ax1.hlines(a, 0, max(total_exec_times), color="black", linestyles='dashed', label="True a value", lw=6)
+    # Adding horizontal lines for the tolerance range around 'a'
+    ax1.axhline(y=a + tol, color='tab:green', linestyle='dashed', linewidth=4, label=f'a + tol')
+    ax1.axhline(y=a - tol, color='tab:green', linestyle='dashed', linewidth=4, label=f'a - tol')
+    # Shading the area between 'a + tol' and 'a - tol'
+    ax1.fill_between([0, max(total_exec_times)], a - tol, a + tol, color='green', alpha=0.3)
+    ax1.legend(loc="best")
+    plt.show()
