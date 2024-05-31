@@ -9,6 +9,7 @@ import torch.nn as nn
 import tqdm as tqdm
 import matplotlib.pyplot as plt
 import time as time
+import seaborn as sns
 
 # RK4 to numerically solve the LV system (Vanessa)
 def RK4(f, x0, t0, tf, num_points):
@@ -81,7 +82,8 @@ def simulate(t_obs, u_obs_x, u_obs_y, t_physics, target_params, tol, max_its, la
     optimiser = torch.optim.Adam(list(pinn.parameters())+[a,b,c,d],lr=1e-3)
     a_t, b_t, c_t, d_t = target_params[0], target_params[1], target_params[2], target_params[3]
     a_s, b_s, c_s, d_s = [], [], [], [] # To keep track of progress
-    times = [] # To keep track of execution time at each iteration (for plotting purposes)
+    a_times, b_times, c_times, d_times = [], [], [], [] # To keep track of execution time at each iteration (for plotting purposes)
+    a_done, b_done, c_done, d_done = False, False, False, False # Keep track of state of each parameter individually
 
     # Start timing
     start_time = time.time()
@@ -118,19 +120,63 @@ def simulate(t_obs, u_obs_x, u_obs_y, t_physics, target_params, tol, max_its, la
         # Backpropagate joint loss, take optimiser step
         loss.backward()
         optimiser.step()
-        # Record current time and parameter values
-        current_time = time.time() - start_time
-        times.append(current_time)
-        a_s.append(a.item())
-        b_s.append(b.item())
-        c_s.append(c.item())
-        d_s.append(d.item())
-        # Check if parameters distance within tolerance
-        if abs(a.item() - a_t) < tol and abs(b.item() - b_t) < tol and abs(c.item() - c_t) < tol and abs(d.item() - d_t) < tol:
-            end_time = time.time() # End timing, early stop
-            return a_s, b_s, c_s, d_s, it, True, (end_time - start_time), times
-    end_time = time.time() # End timing after loop if no early stop
-    return a_s, b_s, c_s, d_s, it, False, (end_time - start_time), times
+        # Record values, stop recording invidually if one of them is done
+        if not a_done:
+            curr_time = time.time()
+            a_times.append(curr_time-start_time)
+            a_s.append(a.item())
+            a_done = True if abs(a.item() - a_t) < tol else False
+        if not b_done:
+            curr_time = time.time()
+            b_times.append(curr_time-start_time)
+            b_s.append(b.item())
+            b_done = True if abs(b.item() - b_t) < tol else False
+        if not c_done:
+            curr_time = time.time()
+            c_times.append(curr_time - start_time)
+            c_s.append(c.item())
+            c_done = True if abs(c.item() - c_t) < tol else False
+
+        if not d_done:
+            curr_time = time.time()
+            d_times.append(curr_time - start_time)
+            d_s.append(d.item())
+            d_done = True if abs(d.item() - d_t) < tol else False
+        
+        if a_done and b_done and c_done and d_done:
+            end_time = time.time()
+            final_time = end_time - start_time
+            return a_s, a_times, b_s, b_times, c_s, c_times, d_s, d_times, final_time, True
+
+    end_time = time.time()
+    final_time = end_time - start_time
+    return a_s, a_times, b_s, b_times, c_s, c_times, d_s, d_times, final_time, False
+
+def stat_report(execution_times):
+    mean = np.mean(execution_times)
+    sd = np.std(execution_times)
+    median = np.median(execution_times)
+    iqr = np.percentile(execution_times, 75) - np.percentile(execution_times, 25)
+
+    print('Printing statistical report of execution time: ')
+    print("Mean:", mean)
+    print("Standard Deviation:", sd)
+    print("Median:", median)
+    print("Interquartile Range:", iqr)
+
+    plt.figure(figsize=(10, 4))
+    plt.subplot(1, 2, 1)
+    sns.histplot(execution_times, color='blue')
+    plt.title("Histogram of Execution Times")
+    plt.xlabel("Execution Time (s)")
+    plt.ylabel("Frequency")
+
+    plt.subplot(1, 2, 2)
+    plt.boxplot(execution_times, vert=False)
+    plt.title("Box Plot of Execution Times")
+    plt.xlabel("Execution Time (s)")
+
+    plt.savefig('./sim_results/execution_time_pinn.png')
 
 if __name__=="__main__": 
     # Setup
@@ -149,36 +195,83 @@ if __name__=="__main__":
     t_physics = torch.linspace(t0, tf, num_phys_locs).view(-1, 1).requires_grad_(True)
     # Hyperparameter deciding weight given to fitting observational data
     lambda_weight = 10
+
     # Simulation setup
-    num_sim = 3 # Number of simulations to run
-    tol = 3 # Tolerance to target needed to stop training
+    num_sim = 10 # Number of simulations to run
+    tol = 7 # Tolerance to target needed to stop training
     max_its = 20000
-    # Training setup
     # Target parameters
     target_params = [a,b,c,d]
-
-    fig, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, figsize=(10, 12))
+    #                                    SIMULATION LOOP
+    # --------------------------------------------------------------------------------------------------
+    fig, axes = plt.subplots(2, 2, figsize=(10, 12))
+    ax1, ax2, ax3, ax4 = axes[0,0], axes[0,1], axes[1,0], axes[1,1]
+    fig.suptitle("Parameter trajectories for all simulations")
     total_exec_times = [] # Keep track of execution time of each simulation
-    for sim_id in range(1, num_sim+1):
-        a_s, b_s, c_s, d_s, it, stopped, total_exec_time, it_exec_times = simulate(t_obs, u_obs_x, u_obs_y, t_physics, target_params, tol, max_its, lambda_weight)
-        print(f'SIM {sim_id}: a={a_s[-1]}, b={b_s[-1]}, c={c_s[-1]}, d={d_s[-1]}, t = {total_exec_time} s')
+    last_a_times, last_b_times, last_c_times, last_d_times = [], [], [], []
+
+    for sim_id in tqdm.tqdm(range(1, num_sim+1)):
+        a_s, a_times, b_s, b_times, c_s, c_times, d_s, d_times, final_time, stopped = simulate(t_obs, u_obs_x, u_obs_y, t_physics, target_params, tol, max_its, lambda_weight)
+        print(f'SIM {sim_id}: a={a_s[-1]}, b={b_s[-1]}, c={c_s[-1]}, d={d_s[-1]}, t = {final_time} s')
+        total_exec_times.append(final_time)
+        last_a_times.append(a_times[-1])
+        last_b_times.append(b_times[-1])
+        last_c_times.append(c_times[-1])
+        last_d_times.append(d_times[-1])
         # Plot trajectories in execution time of each parameter for current simulation
-        ax1.plot(it_exec_times, a_s)
-        # ax2.plot(it_exec_times, b_s)
-        # ax3.plot(it_exec_times, c_s)
-        # ax4.plot(it_exec_times, d_s)
-        total_exec_times.append(total_exec_time)
-    # Configure the first subplot (param a)
+        ax1.plot(a_times, a_s)
+        ax2.plot(b_times, b_s)
+        ax3.plot(c_times, c_s)
+        ax4.plot(d_times, d_s)
+    # --------------------------------------------------------------------------------------------------
+
+    #                                    PLOTTING PARAM TRAJ
+    # --------------------------------------------------------------------------------------------------
     ax1.set_title("a values")
     ax1.set_xlabel("Time (s)")
     ax1.set_ylabel("a value")
-    ax1.set_xlim(0, max(total_exec_times))
+    ax1.set_xlim(0, max(last_a_times))
     ax1.set_ylim(-2,12)
-    ax1.hlines(a, 0, max(total_exec_times), color="black", linestyles='dashed', label="True a value", lw=6)
     # Adding horizontal lines for the tolerance range around 'a'
-    ax1.axhline(y=a + tol, color='tab:green', linestyle='dashed', linewidth=4, label=f'a + tol')
-    ax1.axhline(y=a - tol, color='tab:green', linestyle='dashed', linewidth=4, label=f'a - tol')
+    ax1.axhline(y=a + tol, color='tab:blue', linestyle='dashed', linewidth=1, label=f'a + tol')
+    ax1.axhline(y=a - tol, color='tab:red', linestyle='dashed', linewidth=1, label=f'a - tol')
     # Shading the area between 'a + tol' and 'a - tol'
-    ax1.fill_between([0, max(total_exec_times)], a - tol, a + tol, color='green', alpha=0.3)
+    ax1.fill_between([0,max(last_a_times)], a - tol, a + tol, color='green', alpha=0.3, label='Convergence Region')
     ax1.legend(loc="best")
-    plt.show()
+
+    ax2.set_title("b values")
+    ax2.set_xlabel("Time (s)")
+    ax2.set_ylabel("b value")
+    ax2.set_xlim(0, max(last_b_times))
+    ax2.set_ylim(-2, 12)
+    ax2.axhline(y=b + tol, color='tab:blue', linestyle='dashed', linewidth=1, label=f'b + tol')
+    ax2.axhline(y=b - tol, color='tab:red', linestyle='dashed', linewidth=1, label=f'b - tol')
+    ax2.fill_between([0, max(last_b_times)], b - tol, b + tol, color='green', alpha=0.3, label='Convergence Region')
+    ax2.legend(loc="best")
+
+    ax3.set_title("c values")
+    ax3.set_xlabel("Time (s)")
+    ax3.set_ylabel("c value")
+    ax3.set_xlim(0, max(last_c_times))
+    ax3.set_ylim(-2, 12)
+    ax3.axhline(y=c + tol, color='tab:blue', linestyle='dashed', linewidth=1, label=f'c + tol')
+    ax3.axhline(y=c - tol, color='tab:red', linestyle='dashed', linewidth=1, label=f'c - tol')
+    ax3.fill_between([0, max(last_c_times)], c - tol, c + tol, color='green', alpha=0.3, label='Convergence Region')
+    ax3.legend(loc="best")
+
+    ax4.set_title("d values")
+    ax4.set_xlabel("Time (s)")
+    ax4.set_ylabel("d value")
+    ax4.set_xlim(0, max(last_d_times))
+    ax4.set_ylim(-2, 12)
+    ax4.axhline(y=d + tol, color='tab:blue', linestyle='dashed', linewidth=1, label=f'd + tol')
+    ax4.axhline(y=d - tol, color='tab:red', linestyle='dashed', linewidth=1, label=f'd - tol')
+    ax4.fill_between([0, max(last_d_times)], d - tol, d + tol, color='green', alpha=0.3, label='Convergence Region')
+    ax4.legend(loc="best")
+
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig('./sim_results/param_trajec_pinn.png')
+    # --------------------------------------------------------------------------------------------------
+
+    stat_report(total_exec_times)

@@ -199,13 +199,14 @@ if __name__=="__main__":
     # --------------------------------------------------------------------------------------------------
     # Set up a figure with two subplots: one for betas and one for gammas
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 12))
-    total_exec_times, last_beta_times, all_gamma_times = [], [], []
     fig.suptitle("Parameter trajectories for all simulations")
+    total_exec_times, last_beta_times, last_gamma_times = [], [], []
+
     for sim_id in tqdm.tqdm(range(1,num_sim+1)):
         betas, gammas, it, stopped, total_exec_time, beta_times, gamma_times = simulate(t_obs, u_obs_S, u_obs_I, u_obs_R, t_physics, N, [beta,gamma], tol, max_its, lambda_weight)
         total_exec_times.append(total_exec_time)
         last_beta_times.append(beta_times[-1]) # Keep track of last beta time
-        all_gamma_times.append(gamma_times[-1]) 
+        last_gamma_times.append(gamma_times[-1]) 
         # Plot the beta trajectory for this simulation on the first subplot
         ax1.plot(beta_times, betas)
         # Plot the gamma trajectory for this simulation on the second subplot
@@ -220,24 +221,22 @@ if __name__=="__main__":
     ax1.set_ylabel("Beta value")
     ax1.set_xlim(0, max(last_beta_times))
     ax1.set_ylim(-2,12)
-    # Adding horizontal lines for the tolerance range around 'a'
     ax1.axhline(y=beta + tol, color='tab:blue', linestyle='dashed', linewidth=1, label=f'beta + tol')
     ax1.axhline(y=beta - tol, color='tab:red', linestyle='dashed', linewidth=1, label=f'beta - tol')
-    # Shading the area between 'a + tol' and 'a - tol'
     ax1.fill_between([0, max(last_beta_times)], beta - tol, beta + tol, color='green', alpha=0.3, label='Convergence region')
     ax1.legend(loc="best")
     # Configure the second subplot (gammas)
     ax2.set_title("Gamma values")
     ax2.set_xlabel("Time (s)")
     ax2.set_ylabel("Gamma value")
-    ax2.set_xlim(0, max(all_gamma_times))
+    ax2.set_xlim(0, max(last_gamma_times))
     ax2.set_ylim(-2,12)
     ax2.axhline(y=gamma + tol, color='tab:blue', linestyle='dashed', linewidth=1, label=f'gamma + tol')
     ax2.axhline(y=gamma - tol, color='tab:red', linestyle='dashed', linewidth=1, label=f'gamma - tol')
-    # Shading the area between 'a + tol' and 'a - tol'
-    ax2.fill_between([0, max(all_gamma_times)], gamma - tol, gamma + tol, color='green', alpha=0.3, label='Convergence region')
+    ax2.fill_between([0, max(last_gamma_times)], gamma - tol, gamma + tol, color='green', alpha=0.3, label='Convergence region')
     ax2.legend(loc="best")
     # Show the plot
+    plt.tight_layout()
     plt.savefig('./sim_results/param_trajec_pinn.png')
     # --------------------------------------------------------------------------------------------------
 

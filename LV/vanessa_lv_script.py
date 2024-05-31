@@ -7,6 +7,8 @@ from random import choices, seed, random
 from tqdm import tqdm
 import os
 import matplotlib.pyplot as plt
+import time as time
+import seaborn as sns
 
 # Calculate the Euclidean distance between two datasets
 def euc_dist(data1, data2):
@@ -212,6 +214,33 @@ def principal(epsilons,listaparametros,N,data1,t, tol_target):
     #print('dist',dist[T-1])
     return sample, weight, dist,data2, False
 
+
+def stat_report(execution_times):
+    mean = np.mean(execution_times)
+    sd = np.std(execution_times)
+    median = np.median(execution_times)
+    iqr = np.percentile(execution_times, 75) - np.percentile(execution_times, 25)
+
+    print('Printing statistical report of execution time: ')
+    print("Mean:", mean)
+    print("Standard Deviation:", sd)
+    print("Median:", median)
+    print("Interquartile Range:", iqr)
+
+    plt.figure(figsize=(10, 4))
+    plt.subplot(1, 2, 1)
+    sns.histplot(execution_times, color='blue')
+    plt.title("Histogram of Execution Times")
+    plt.xlabel("Execution Time (s)")
+    plt.ylabel("Frequency")
+
+    plt.subplot(1, 2, 2)
+    plt.boxplot(execution_times, vert=False)
+    plt.title("Box Plot of Execution Times")
+    plt.xlabel("Execution Time (s)")
+
+    plt.savefig('./sim_results/execution_time_abc.png')
+
 if __name__ == "__main__":
 
     # Define the tolerances for each iteration
@@ -241,21 +270,17 @@ if __name__ == "__main__":
     midata = np.vstack((x_obs, y_obs)).T
 
     # Define tolerance distance to target parameters for early stopping
-    tol_target = [0.02, 0.02, 0.02, 0.02]
+    tol_target = [1, 1, 1, 1]
 
-    sample,weight,dist,data2, stopped_early =principal(epsilons,params_lotka_volterra,100,midata,t, tol_target)
+    num_sim = 3
+    exec_times = []
+    for sim_id in tqdm.tqdm(range(1, num_sim+1)):
+        print(f'SIM {sim_id}')
+        start_time = time.time()
+        sample,weight,dist,data2, stopped_early =principal(epsilons,params_lotka_volterra,100,midata,t, tol_target)
+        end_time = time.time()
+        total_time = end_time - start_time
+        print(f'Total time for current simulation: {total_time}')
+        exec_times.append(total_time)
 
-    # Check if stopped early
-    if stopped_early:
-        print("Algorithm stopped early due to convergence.")
-    else:
-        # Process results if the algorithm completes all iterations
-        final_samples = sample[-1]  # Last set of samples
-        final_distances = dist[-1]  # Last set of distances
-        best_index = np.argmin(final_distances)
-        # Extract the best parameter set
-        best_params = final_samples[best_index]
-        print(f"a: {best_params[0]}")
-        print(f"b: {best_params[1]}")
-        print(f"c: {best_params[2]}")
-        print(f"d: {best_params[3]}")
+    stat_report(exec_times)
