@@ -1,0 +1,5 @@
+Printing statistical report of execution time: 
+Mean: 9.890724048614501
+Standard Deviation: 4.993243783437279
+Median: 7.014499306678772
+Interquartile Range: 8.642428278923035
