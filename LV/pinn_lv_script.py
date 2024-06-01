@@ -51,7 +51,7 @@ class FCN(nn.Module):
     
 def get_obs_data(t,x,y):
     # Generate 8 equispaced time locations in the domain for fair comparison with ABC-SMC
-    obs_ind = np.linspace(0, len(t) - 1, 15, dtype=int)
+    obs_ind = np.linspace(0, len(t) - 1, 8, dtype=int)
     # Get solution at those time locations
     x_obs = np.array([x[ind] for ind in obs_ind])
     y_obs = np.array([y[ind] for ind in obs_ind])
