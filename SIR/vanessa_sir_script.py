@@ -249,7 +249,7 @@ def stat_report(execution_times):
     plt.xlabel("Execution Time (s)")
     plt.yticks([])  # Hides y-axis labels
 
-    plt.savefig('.sim_results/execution_time_abc.png')
+    plt.savefig('./sim_results/execution_time_abc.png')
 
 if __name__ == "__main__":
     # Total population, N.

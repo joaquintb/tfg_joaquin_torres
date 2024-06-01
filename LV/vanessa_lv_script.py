@@ -253,8 +253,6 @@ if __name__ == "__main__":
     X0=[0.5,1]
     # 8 equispaced time locations
     t=[1.1, 2.4, 3.9, 5.6, 7.5, 9.6, 11.9, 14.4]
-    # To solve system numerically
-    t1=np.linspace(0,15,1000)
     # Solution at 8 observational points
     midata=rk4(lotka_volterra,X0,t,parametros)
     x,y = midata.T    
