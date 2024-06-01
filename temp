@@ -1,1 +1,1 @@
-python pinn_lv_script.py > "./sim_results/statistics_pinn.txt"
+python3 pinn_sir_script.py > "./sim_results/statistics_pinn.txt"
