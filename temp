@@ -1,1 +1,0 @@
-python pinn_sir_script.py > "./sim_results/statistics_pinn.txt"
