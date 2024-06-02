@@ -1,11 +1,8 @@
 import numpy as np
-from scipy.stats import norm, uniform, multivariate_normal
-from scipy.optimize import minimize
-from scipy.special import logsumexp
-import sys, ast
-from random import choices, seed, random
+from scipy.stats import uniform, multivariate_normal
+import sys
+from random import choices, seed
 from tqdm import tqdm
-import os
 import matplotlib.pyplot as plt
 import time as time
 import seaborn as sns
@@ -140,7 +137,7 @@ def principal(epsilons,listaparametros,N,data1,t, tol_target):
     weight=np.zeros((T,N),float)
     dist=np.zeros((T,N),float)
     sample=np.zeros((T,N),list)
-    X0=[1.0,0.5]
+    X0=[0.5,1]
     #t=np.linspace(0.,10,10)
     for i in range(T):
         count=0
@@ -163,7 +160,6 @@ def principal(epsilons,listaparametros,N,data1,t, tol_target):
                 #print(count)
        
         else:
-        
             for j in range (N):
                 dist[i,j]=epsilons[i]+1
                 while dist[i,j]>epsilons[i]:
@@ -200,8 +196,8 @@ def principal(epsilons,listaparametros,N,data1,t, tol_target):
         best_index = np.argmin(dist[i, :])
         best_params = sample[i, best_index]
         if all(abs(best_params[k] - listaparametros[k]['target_value']) < tol_target[k] for k in range(len(best_params))):
-            print(f"Converged to within tolerance at iteration {i + 1}.")
-            print(f"Best parameters: a={best_params[0]}, b={best_params[1]}, c={best_params[2]}, d={best_params[3]}")
+            #print(f"Converged to within tolerance at iteration {i + 1}.")
+            #print(f"Best parameters: a={best_params[0]}, b={best_params[1]}, c={best_params[2]}, d={best_params[3]}")
             return sample, weight, dist, data2, True  # Return with a flag indicating early stopping
            #print('weight[i,:] normalized',weight[i,:])
         #pars = np.loadtxt('smc_van/pars_{}.out'.format(i))
@@ -248,17 +244,15 @@ if __name__ == "__main__":
     parametros = [1,1,1,1]
     # Define the parameter ranges for the Lotka-Volterra model
     params_lotka_volterra = [
-        {'name': 'a', 'lower_limit': 0.0, 'upper_limit': 10.0, 'target_value': parametros[0]},  # growth rate of prey in absence of predators
-        {'name': 'b', 'lower_limit': 0.0, 'upper_limit': 10.0, 'target_value': parametros[1]},  # predation rate
-        {'name': 'c', 'lower_limit': 0.0, 'upper_limit': 10.0, 'target_value': parametros[2]},  # mortality rate of predators
-        {'name': 'd', 'lower_limit': 0.0, 'upper_limit': 10.0, 'target_value': parametros[3]}   # rate at which predators increase by consuming prey
+        {'name': 'a', 'lower_limit': 0.0, 'upper_limit': 5.0, 'target_value': parametros[0]},  # growth rate of prey in absence of predators
+        {'name': 'b', 'lower_limit': 0.0, 'upper_limit': 5.0, 'target_value': parametros[1]},  # predation rate
+        {'name': 'c', 'lower_limit': 0.0, 'upper_limit': 5.0, 'target_value': parametros[2]},  # mortality rate of predators
+        {'name': 'd', 'lower_limit': 0.0, 'upper_limit': 5.0, 'target_value': parametros[3]}   # rate at which predators increase by consuming prey
     ]
 
     X0=[0.5,1]
     # 8 equispaced time locations
     t=[1.1, 2.4, 3.9, 5.6, 7.5, 9.6, 11.9, 14.4]
-    # To solve system numerically
-    t1=np.linspace(0,15,1000)
     # Solution at 8 observational points
     midata=rk4(lotka_volterra,X0,t,parametros)
     x,y = midata.T    
@@ -270,17 +264,17 @@ if __name__ == "__main__":
     midata = np.vstack((x_obs, y_obs)).T
 
     # Define tolerance distance to target parameters for early stopping
-    tol_target = [1, 1, 1, 1]
+    tol_target = [0.1, 0.1, 0.1, 0.1]
 
-    num_sim = 3
+    num_sim = 100
     exec_times = []
-    for sim_id in tqdm.tqdm(range(1, num_sim+1)):
-        print(f'SIM {sim_id}')
+    for sim_id in tqdm(range(1, num_sim+1)):
+        #print(f'SIM {sim_id}')
         start_time = time.time()
         sample,weight,dist,data2, stopped_early =principal(epsilons,params_lotka_volterra,100,midata,t, tol_target)
         end_time = time.time()
         total_time = end_time - start_time
-        print(f'Total time for current simulation: {total_time}')
+        #print(f'Total time for current simulation: {total_time}')
         exec_times.append(total_time)
 
     stat_report(exec_times)

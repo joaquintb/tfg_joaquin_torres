@@ -73,13 +73,13 @@ def get_obs_data(t,x,y):
 def simulate(t_obs, u_obs_x, u_obs_y, t_physics, target_params, tol, max_its, lambda_weight):
     # Initialize PINN
     pinn = FCN(1,1,32,3) 
-    # Sample initial problems parameters from uniform 0 to 10 for comparison to be fair
-    a = torch.nn.Parameter(torch.empty(1).uniform_(0, 10), requires_grad=True)
-    b = torch.nn.Parameter(torch.empty(1).uniform_(0, 10), requires_grad=True)
-    c = torch.nn.Parameter(torch.empty(1).uniform_(0, 10), requires_grad=True)
-    d = torch.nn.Parameter(torch.empty(1).uniform_(0, 10), requires_grad=True)
+    # Sample initial problems parameters from uniform 0 to 5 for comparison to be fair
+    a = torch.nn.Parameter(torch.empty(1).uniform_(0, 5), requires_grad=True)
+    b = torch.nn.Parameter(torch.empty(1).uniform_(0, 5), requires_grad=True)
+    c = torch.nn.Parameter(torch.empty(1).uniform_(0, 5), requires_grad=True)
+    d = torch.nn.Parameter(torch.empty(1).uniform_(0, 5), requires_grad=True)
     # Define optimiser and make problem parameters learnable
-    optimiser = torch.optim.Adam(list(pinn.parameters())+[a,b,c,d],lr=1e-3)
+    optimiser = torch.optim.Adam(list(pinn.parameters())+[a,b,c,d],lr=1e-2)
     a_t, b_t, c_t, d_t = target_params[0], target_params[1], target_params[2], target_params[3]
     a_s, b_s, c_s, d_s = [], [], [], [] # To keep track of progress
     a_times, b_times, c_times, d_times = [], [], [], [] # To keep track of execution time at each iteration (for plotting purposes)
@@ -186,19 +186,19 @@ if __name__=="__main__":
     x0 = np.array([0.5,1]) # IC
     # Solving the problem
     t0, tf = 0, 15
-    num_points = 800
+    num_points = 1000
     x, t = RK4(f, x0, t0, tf, num_points)
     # Get observational data from the solution
     t_obs, u_obs_x, u_obs_y = get_obs_data(t, x[0], x[1])
     # Tensor of times to train PINN through physics loss
-    num_phys_locs = 1000
+    num_phys_locs = 700
     t_physics = torch.linspace(t0, tf, num_phys_locs).view(-1, 1).requires_grad_(True)
     # Hyperparameter deciding weight given to fitting observational data
     lambda_weight = 10
 
     # Simulation setup
-    num_sim = 10 # Number of simulations to run
-    tol = 7 # Tolerance to target needed to stop training
+    num_sim = 100 # Number of simulations to run
+    tol = 0.1 # Tolerance to target needed to stop training
     max_its = 20000
     # Target parameters
     target_params = [a,b,c,d]
@@ -212,7 +212,7 @@ if __name__=="__main__":
 
     for sim_id in tqdm.tqdm(range(1, num_sim+1)):
         a_s, a_times, b_s, b_times, c_s, c_times, d_s, d_times, final_time, stopped = simulate(t_obs, u_obs_x, u_obs_y, t_physics, target_params, tol, max_its, lambda_weight)
-        print(f'SIM {sim_id}: a={a_s[-1]}, b={b_s[-1]}, c={c_s[-1]}, d={d_s[-1]}, t = {final_time} s')
+        # print(f'SIM {sim_id}: a={a_s[-1]}, b={b_s[-1]}, c={c_s[-1]}, d={d_s[-1]}, t = {final_time} s')
         total_exec_times.append(final_time)
         last_a_times.append(a_times[-1])
         last_b_times.append(b_times[-1])
@@ -231,7 +231,7 @@ if __name__=="__main__":
     ax1.set_xlabel("Time (s)")
     ax1.set_ylabel("a value")
     ax1.set_xlim(0, max(last_a_times))
-    ax1.set_ylim(-2,12)
+    ax1.set_ylim(-1,6)
     # Adding horizontal lines for the tolerance range around 'a'
     ax1.axhline(y=a + tol, color='tab:blue', linestyle='dashed', linewidth=1, label=f'a + tol')
     ax1.axhline(y=a - tol, color='tab:red', linestyle='dashed', linewidth=1, label=f'a - tol')
@@ -243,7 +243,7 @@ if __name__=="__main__":
     ax2.set_xlabel("Time (s)")
     ax2.set_ylabel("b value")
     ax2.set_xlim(0, max(last_b_times))
-    ax2.set_ylim(-2, 12)
+    ax2.set_ylim(-1, 6)
     ax2.axhline(y=b + tol, color='tab:blue', linestyle='dashed', linewidth=1, label=f'b + tol')
     ax2.axhline(y=b - tol, color='tab:red', linestyle='dashed', linewidth=1, label=f'b - tol')
     ax2.fill_between([0, max(last_b_times)], b - tol, b + tol, color='green', alpha=0.3, label='Convergence Region')
@@ -253,7 +253,7 @@ if __name__=="__main__":
     ax3.set_xlabel("Time (s)")
     ax3.set_ylabel("c value")
     ax3.set_xlim(0, max(last_c_times))
-    ax3.set_ylim(-2, 12)
+    ax3.set_ylim(-1, 6)
     ax3.axhline(y=c + tol, color='tab:blue', linestyle='dashed', linewidth=1, label=f'c + tol')
     ax3.axhline(y=c - tol, color='tab:red', linestyle='dashed', linewidth=1, label=f'c - tol')
     ax3.fill_between([0, max(last_c_times)], c - tol, c + tol, color='green', alpha=0.3, label='Convergence Region')
@@ -263,7 +263,7 @@ if __name__=="__main__":
     ax4.set_xlabel("Time (s)")
     ax4.set_ylabel("d value")
     ax4.set_xlim(0, max(last_d_times))
-    ax4.set_ylim(-2, 12)
+    ax4.set_ylim(-1, 6)
     ax4.axhline(y=d + tol, color='tab:blue', linestyle='dashed', linewidth=1, label=f'd + tol')
     ax4.axhline(y=d - tol, color='tab:red', linestyle='dashed', linewidth=1, label=f'd - tol')
     ax4.fill_between([0, max(last_d_times)], d - tol, d + tol, color='green', alpha=0.3, label='Convergence Region')

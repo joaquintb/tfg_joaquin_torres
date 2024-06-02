@@ -162,7 +162,9 @@ def stat_report(execution_times):
     plt.subplot(1, 2, 2)
     plt.boxplot(execution_times, vert=False)
     plt.title("Box Plot of Execution Times")
+    plt.yticks([])  # Hides y-axis labels
     plt.xlabel("Execution Time (s)")
+
 
     plt.savefig('./sim_results/execution_time_pinn.png')
 
