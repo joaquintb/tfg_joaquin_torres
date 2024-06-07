@@ -4,9 +4,9 @@
 # Universidad Carlos III de Madrid
 
 # ------------------------------------------------------------------------------------------------------
-# This script is an adaptation of the code originally authored by vgarcialopezm.
+# This script is an adaptation of the code originally authored by Vanessa García López
 # The original Jupyter notebook can be found at:
-#   https://github.com/vgarcialopezm/ABC-SMC/blob/main/SIR_BUENO.ipynb
+# https://github.com/vgarcialopezm/ABC-SMC/blob/main/SIR_BUENO.ipynb
 # ------------------------------------------------------------------------------------------------------
 
 # Importing libraries
@@ -299,12 +299,12 @@ if __name__ == "__main__":
     {'name': 'beta', 'lower_limit': 0, 'upper_limit': 10.0, 'target_value': betaI},
     {'name': 'gamma', 'lower_limit': 0, 'upper_limit': 10.0, 'target_value': gammaI}
     ]
-    # --------------------------------------------------------------------------------------------------
-    #                                    SIMULATION LOOP
-    # --------------------------------------------------------------------------------------------------
     epsilons=[60, 50, 40, 20, 10, 5,2,1.5,1,0.5]
     # Define tolerance distance to target parameters for early stopping
     tol_target = [0.1, 0.1]
+    # --------------------------------------------------------------------------------------------------
+    #                                    SIMULATION LOOP
+    # --------------------------------------------------------------------------------------------------
     num_sim = 100
     exec_times = []
     for sim_id in tqdm.tqdm(range(1, num_sim+1)):
