@@ -1,8 +1,16 @@
 # Author: Joaquín Torres Bravo
 # Date: June 2024
 # Bachelor Thesis
+# Universidad Carlos III de Madrid
 
-# Libraries
+# ------------------------------------------------------------------------------------------------------
+# Portions of this code are adapted from the work by Ben Moseley, 2022
+# Original source is licensed under the MIT License:
+# https://github.com/benmoseley/harmonic-oscillator-pinn-workshop/blob/main/PINN_intro_workshop.ipynb
+# ------------------------------------------------------------------------------------------------------
+
+# Importing libraries
+# ------------------------------------------------------------------------------------------------------
 import numpy as np
 import torch
 import torch.nn as nn
@@ -11,8 +19,11 @@ from scipy.integrate import odeint
 import time
 import matplotlib.pyplot as plt
 import seaborn as sns
+# ------------------------------------------------------------------------------------------------------
 
-# Aux function to return RHS of ODE system
+# Auxiliary functions
+# ------------------------------------------------------------------------------------------------------
+# Return RHS of SIR ODE system
 def SIR(x, t, N, beta, gamma):
     S, I, R = x
     xdot = [
@@ -22,30 +33,7 @@ def SIR(x, t, N, beta, gamma):
     ]
     return xdot
 
-# Defining the network
-class FCN(nn.Module):
-    def __init__(self, N_INPUT, N_OUTPUT, N_HIDDEN, N_LAYERS):
-        super().__init__()
-        activation = nn.Tanh
-        self.fcs = nn.Sequential(*[
-                        nn.Linear(N_INPUT, N_HIDDEN),
-                        activation()])
-        self.fch = nn.Sequential(*[
-                        nn.Sequential(*[
-                            nn.Linear(N_HIDDEN, N_HIDDEN),
-                            activation()]) for _ in range(N_LAYERS-1)])
-        self.fce_S = nn.Linear(N_HIDDEN, N_OUTPUT)
-        self.fce_I = nn.Linear(N_HIDDEN, N_OUTPUT)
-        self.fce_R = nn.Linear(N_HIDDEN, N_OUTPUT)
-
-    def forward(self, x):
-        x = self.fcs(x)
-        x = self.fch(x)
-        S_output = self.fce_S(x)
-        I_output = self.fce_I(x)
-        R_output = self.fce_R(x)
-        return S_output, I_output, R_output
-    
+# Generating observational data
 def get_obs_data(t, S,I,R):
     # Generating observations
     # Generate 10 equispaced time locations in the domain for fair comparison with ABC-SMC
@@ -72,7 +60,7 @@ def get_obs_data(t, S,I,R):
 
     return t_obs, u_obs_S, u_obs_I, u_obs_R
 
-# Function to simulate training the PINN
+# Simulation block, training the PINN
 def simulate(t_obs, u_obs_S, u_obs_I, u_obs_R, t_physics, N, target_params, tol, max_its, lambda_weight):
     # Training setup
     # Initialize PINN
@@ -134,41 +122,68 @@ def simulate(t_obs, u_obs_S, u_obs_I, u_obs_R, t_physics, N, target_params, tol,
         if beta_done and gamma_done:
             end_time = time.time()
             final_time = end_time - start_time
+            # returns: betas, gammas, it, stopped, total_exec_time, beta_times, gamma_times
             return betas, gammas, it, True, final_time, beta_times, gamma_times
     
     end_time = time.time()  # End timing after loop if no early stop
     final_time = end_time - start_time
+    # returns: betas, gammas, it, stopped, total_exec_time, beta_times, gamma_times
     return betas, gammas, it, False, final_time, beta_times, gamma_times
 
+# Generate basic statistical report with plots and summary statistics
 def stat_report(execution_times):
     mean = np.mean(execution_times)
     sd = np.std(execution_times)
     median = np.median(execution_times)
     iqr = np.percentile(execution_times, 75) - np.percentile(execution_times, 25)
-
     print('Printing statistical report of execution time: ')
     print("Mean:", mean)
     print("Standard Deviation:", sd)
     print("Median:", median)
     print("Interquartile Range:", iqr)
-
     plt.figure(figsize=(10, 4))
     plt.subplot(1, 2, 1)
     sns.histplot(execution_times, color='blue')
     plt.title("Histogram of Execution Times")
     plt.xlabel("Execution Time (s)")
     plt.ylabel("Frequency")
-
     plt.subplot(1, 2, 2)
     plt.boxplot(execution_times, vert=False)
     plt.title("Box Plot of Execution Times")
     plt.yticks([])  # Hides y-axis labels
     plt.xlabel("Execution Time (s)")
-
-
     plt.savefig('./sim_results/execution_time_pinn.png')
+# ------------------------------------------------------------------------------------------------------
+
+# Defining the network
+# ------------------------------------------------------------------------------------------------------
+class FCN(nn.Module):
+    def __init__(self, N_INPUT, N_OUTPUT, N_HIDDEN, N_LAYERS):
+        super().__init__()
+        activation = nn.Tanh
+        self.fcs = nn.Sequential(*[
+                        nn.Linear(N_INPUT, N_HIDDEN),
+                        activation()])
+        self.fch = nn.Sequential(*[
+                        nn.Sequential(*[
+                            nn.Linear(N_HIDDEN, N_HIDDEN),
+                            activation()]) for _ in range(N_LAYERS-1)])
+        self.fce_S = nn.Linear(N_HIDDEN, N_OUTPUT)
+        self.fce_I = nn.Linear(N_HIDDEN, N_OUTPUT)
+        self.fce_R = nn.Linear(N_HIDDEN, N_OUTPUT)
+
+    def forward(self, x):
+        x = self.fcs(x)
+        x = self.fch(x)
+        S_output = self.fce_S(x)
+        I_output = self.fce_I(x)
+        R_output = self.fce_R(x)
+        return S_output, I_output, R_output
+# ------------------------------------------------------------------------------------------------------
 
 if __name__=="__main__": 
+    #                                    PROBLEM SETUP
+    # --------------------------------------------------------------------------------------------------
     # Defining the problem
     N = 100  # Total population
     # Initial number of infected and recovered individuals
@@ -177,7 +192,7 @@ if __name__=="__main__":
     S0 = N - I0 - R0
     # Initial state of the system
     X0 = [S0, I0, R0]
-    # Parameters
+    # Target parameters
     beta, gamma = 1.5, 0.5
     # A grid of time points (in days)
     finalT = 17.0
@@ -196,6 +211,7 @@ if __name__=="__main__":
     num_sim = 100 # Number of simulations to run
     tol = 0.1 # Tolerance to target needed to stop training
     max_its = 10000
+    # --------------------------------------------------------------------------------------------------
 
     #                                    SIMULATION LOOP
     # --------------------------------------------------------------------------------------------------
@@ -207,7 +223,7 @@ if __name__=="__main__":
     for sim_id in tqdm.tqdm(range(1,num_sim+1)):
         betas, gammas, it, stopped, total_exec_time, beta_times, gamma_times = simulate(t_obs, u_obs_S, u_obs_I, u_obs_R, t_physics, N, [beta,gamma], tol, max_its, lambda_weight)
         total_exec_times.append(total_exec_time)
-        last_beta_times.append(beta_times[-1]) # Keep track of last beta time
+        last_beta_times.append(beta_times[-1]) # Keep track of last beta time for plot
         last_gamma_times.append(gamma_times[-1]) 
         # Plot the beta trajectory for this simulation on the first subplot
         ax1.plot(beta_times, betas)
@@ -241,6 +257,6 @@ if __name__=="__main__":
     plt.tight_layout()
     plt.savefig('./sim_results/param_trajec_pinn.png')
     # --------------------------------------------------------------------------------------------------
-
+    
     # Generate statistical report on execution times
     stat_report(total_exec_times)
