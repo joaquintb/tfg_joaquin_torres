@@ -24,26 +24,8 @@ import time as time
 import seaborn as sns
 # ------------------------------------------------------------------------------------------------------
 
-# Aux functions
+# Defining the network
 # ------------------------------------------------------------------------------------------------------
-# RK4 to numerically solve the LV system (Vanessa)
-def RK4(f, x0, t0, tf, num_points):
-    t = np.linspace(t0,tf, num_points)
-    dt = (tf - t0) / (num_points - 1)
-    nt = t.size
-    nx = x0.size
-    x = np.zeros((nx,nt))
-    x[:,0] = x0 # Initial condition
-    for k in range(nt-1):
-        k1 = dt*f(t[k], x[:,k])
-        k2 = dt*f(t[k] + dt/2, x[:,k] + k1/2)
-        k3 = dt*f(t[k] + dt/2, x[:,k] + k2/2)
-        k4 = dt*f(t[k] + dt, x[:,k] + k3)
-        dx=(k1 + 2*k2 + 2*k3 +k4)/6
-        x[:,k+1] = x[:,k] + dx
-    return x, t
-
-# PINN model definition
 class FCN(nn.Module):
     def __init__(self, N_INPUT, N_OUTPUT, N_HIDDEN, N_LAYERS):
         super().__init__()
@@ -63,6 +45,26 @@ class FCN(nn.Module):
         prey_output = self.fce_prey(x)
         predator_output = self.fce_predator(x)
         return prey_output, predator_output
+# ------------------------------------------------------------------------------------------------------
+
+# Aux functions
+# ------------------------------------------------------------------------------------------------------
+# RK4 to numerically solve the LV system (Vanessa)
+def RK4(f, x0, t0, tf, num_points):
+    t = np.linspace(t0,tf, num_points)
+    dt = (tf - t0) / (num_points - 1)
+    nt = t.size
+    nx = x0.size
+    x = np.zeros((nx,nt))
+    x[:,0] = x0 # Initial condition
+    for k in range(nt-1):
+        k1 = dt*f(t[k], x[:,k])
+        k2 = dt*f(t[k] + dt/2, x[:,k] + k1/2)
+        k3 = dt*f(t[k] + dt/2, x[:,k] + k2/2)
+        k4 = dt*f(t[k] + dt, x[:,k] + k3)
+        dx=(k1 + 2*k2 + 2*k3 +k4)/6
+        x[:,k+1] = x[:,k] + dx
+    return x, t
     
 # Generating observational data
 def get_obs_data(t,x,y):

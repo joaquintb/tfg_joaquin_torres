@@ -21,6 +21,32 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 # ------------------------------------------------------------------------------------------------------
 
+# Defining the network
+# ------------------------------------------------------------------------------------------------------
+class FCN(nn.Module):
+    def __init__(self, N_INPUT, N_OUTPUT, N_HIDDEN, N_LAYERS):
+        super().__init__()
+        activation = nn.Tanh
+        self.fcs = nn.Sequential(*[
+                        nn.Linear(N_INPUT, N_HIDDEN),
+                        activation()])
+        self.fch = nn.Sequential(*[
+                        nn.Sequential(*[
+                            nn.Linear(N_HIDDEN, N_HIDDEN),
+                            activation()]) for _ in range(N_LAYERS-1)])
+        self.fce_S = nn.Linear(N_HIDDEN, N_OUTPUT)
+        self.fce_I = nn.Linear(N_HIDDEN, N_OUTPUT)
+        self.fce_R = nn.Linear(N_HIDDEN, N_OUTPUT)
+
+    def forward(self, x):
+        x = self.fcs(x)
+        x = self.fch(x)
+        S_output = self.fce_S(x)
+        I_output = self.fce_I(x)
+        R_output = self.fce_R(x)
+        return S_output, I_output, R_output
+# ------------------------------------------------------------------------------------------------------
+
 # Auxiliary functions
 # ------------------------------------------------------------------------------------------------------
 # Return RHS of SIR ODE system
@@ -153,32 +179,6 @@ def stat_report(execution_times):
     plt.yticks([])  # Hides y-axis labels
     plt.xlabel("Execution Time (s)")
     plt.savefig('./sim_results/execution_time_pinn.png')
-# ------------------------------------------------------------------------------------------------------
-
-# Defining the network
-# ------------------------------------------------------------------------------------------------------
-class FCN(nn.Module):
-    def __init__(self, N_INPUT, N_OUTPUT, N_HIDDEN, N_LAYERS):
-        super().__init__()
-        activation = nn.Tanh
-        self.fcs = nn.Sequential(*[
-                        nn.Linear(N_INPUT, N_HIDDEN),
-                        activation()])
-        self.fch = nn.Sequential(*[
-                        nn.Sequential(*[
-                            nn.Linear(N_HIDDEN, N_HIDDEN),
-                            activation()]) for _ in range(N_LAYERS-1)])
-        self.fce_S = nn.Linear(N_HIDDEN, N_OUTPUT)
-        self.fce_I = nn.Linear(N_HIDDEN, N_OUTPUT)
-        self.fce_R = nn.Linear(N_HIDDEN, N_OUTPUT)
-
-    def forward(self, x):
-        x = self.fcs(x)
-        x = self.fch(x)
-        S_output = self.fce_S(x)
-        I_output = self.fce_I(x)
-        R_output = self.fce_R(x)
-        return S_output, I_output, R_output
 # ------------------------------------------------------------------------------------------------------
 
 if __name__=="__main__": 
